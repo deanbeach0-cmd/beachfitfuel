@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;800;900&display=swap');
+@import "tw-animate-css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Brand design tokens ─────────────────────────────────── */
+    --pink:   #FF7B9D;
+    --orange: #EC8A1E;
+    --yellow: #FAB65F;
+    --sky:    #9BBDCF;
+    --teal:   #6FBDB8;
+    --cream:  #FFF8EE;
+    --dark:   #2C2C2C;
+
+    --font-display: 'Bebas Neue';
+    --font-body:    'Nunito';
+
+    /* ── shadcn/ui HSL tokens — mapped to brand palette ─────── */
+    --background:   42 100% 97%;   /* cream */
+    --foreground:   0 0% 17%;      /* dark  */
+
+    --card:             42 100% 97%;
+    --card-foreground:  0 0% 17%;
+
+    --popover:             42 100% 97%;
+    --popover-foreground:  0 0% 17%;
+
+    --primary:             344 100% 74%;   /* pink */
+    --primary-foreground:  0 0% 100%;
+
+    --secondary:             25 83% 52%;   /* orange */
+    --secondary-foreground:  0 0% 100%;
+
+    --muted:             196 31% 71%;      /* sky */
+    --muted-foreground:  0 0% 40%;
+
+    --accent:             177 38% 58%;     /* teal */
+    --accent-foreground:  0 0% 100%;
+
+    --destructive:             0 84% 60%;
+    --destructive-foreground:  0 0% 100%;
+
+    --border: 196 31% 71%;
+    --input:  196 31% 71%;
+    --ring:   344 100% 74%;
+
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-cream text-dark antialiased;
+    font-family: var(--font-body), sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display), sans-serif;
+    letter-spacing: 0.05em;
+  }
+}
+
+@layer utilities {
+  .gradient-brand {
+    background: linear-gradient(135deg, var(--pink) 0%, var(--orange) 50%, var(--yellow) 100%);
+  }
+  .gradient-ocean {
+    background: linear-gradient(135deg, var(--teal) 0%, var(--sky) 100%);
+  }
+  .text-gradient-brand {
+    background: linear-gradient(135deg, var(--pink), var(--orange));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .dotted-border {
+    border: 3px dotted currentColor;
+  }
+}
