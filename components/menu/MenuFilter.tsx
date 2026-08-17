@@ -1,28 +1,27 @@
-import { FilterCategory, DrinkCategory, CATEGORY_META } from '@/types/menu'
-
-interface MenuFilterProps {
-  active: FilterCategory
-  onChange: (category: FilterCategory) => void
-  counts?: Partial<Record<FilterCategory, number>>
+export interface CategoryFilterOption {
+  value: string // category_name
+  emoji: string
+  color: string
 }
 
-const FILTERS: { label: string; value: FilterCategory }[] = [
-  { label: 'All',           value: 'all' },
-  { label: 'Beach Bombs',   value: 'beach_bomb' },
-  { label: 'Protein Shakes',value: 'protein_shake' },
-  { label: 'Blenders',      value: 'blender' },
-  { label: 'Energy Drinks', value: 'energy_drink' },
-  { label: 'Food',          value: 'food' },
-]
+interface MenuFilterProps {
+  active: string // category_name, or 'all'
+  onChange: (category: string) => void
+  categories: CategoryFilterOption[]
+  counts?: Record<string, number>
+}
 
-export function MenuFilter({ active, onChange, counts }: MenuFilterProps) {
+export function MenuFilter({ active, onChange, categories, counts }: MenuFilterProps) {
+  const filters = [{ value: 'all', label: 'All', color: '#EC8A1E' }, ...categories.map((c) => ({
+    value: c.value,
+    label: `${c.emoji} ${c.value}`,
+    color: c.color,
+  }))]
+
   return (
     <div className="flex flex-wrap gap-2">
-      {FILTERS.map((f) => {
+      {filters.map((f) => {
         const isActive = active === f.value
-        const color = f.value === 'all'
-          ? '#EC8A1E'
-          : CATEGORY_META[f.value as DrinkCategory].color
         const count = counts?.[f.value]
 
         return (
@@ -32,7 +31,7 @@ export function MenuFilter({ active, onChange, counts }: MenuFilterProps) {
             className="flex items-center gap-1.5 font-body font-700 text-sm px-4 py-2 rounded-full transition-all hover:scale-[1.03] active:scale-[0.97]"
             style={
               isActive
-                ? { backgroundColor: color, color: 'white', boxShadow: `0 2px 8px ${color}55` }
+                ? { backgroundColor: f.color, color: 'white', boxShadow: `0 2px 8px ${f.color}55` }
                 : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #9BBDCF' }
             }
           >

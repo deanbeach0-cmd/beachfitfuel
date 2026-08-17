@@ -1,21 +1,27 @@
 import Image from 'next/image'
-import { MenuItem, CATEGORY_META, TAG_LABELS } from '@/types/menu'
+import Link from 'next/link'
+import { MenuItem, TAG_LABELS } from '@/types/menu'
+import { getCategoryStyle } from '@/lib/category-style'
 
 interface DrinkCardProps {
   item: MenuItem
+  onAddToOrder?: (item: MenuItem) => void
 }
 
-export function DrinkCard({ item }: DrinkCardProps) {
-  const meta = CATEGORY_META[item.category]
+export function DrinkCard({ item, onAddToOrder }: DrinkCardProps) {
+  const style = getCategoryStyle(item.square_category_id ?? item.id, item.category_emoji, item.category_color)
   const price = `$${Number(item.price).toFixed(2)}`
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-sky/20 flex flex-col hover:shadow-md transition-shadow">
+    <Link
+      href={`/menu/marshall/${item.id}`}
+      className="bg-white rounded-2xl overflow-hidden shadow-sm border border-sky/20 flex flex-col hover:shadow-md transition-shadow"
+    >
 
       {/* Image or colored placeholder */}
       <div
         className="relative h-40 flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: meta.color + '33' }}
+        style={{ backgroundColor: style.color + '33' }}
       >
         {item.image_url ? (
           <Image
@@ -26,18 +32,20 @@ export function DrinkCard({ item }: DrinkCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         ) : (
-          <span className="text-5xl" role="img" aria-label={meta.label}>
-            {meta.emoji}
+          <span className="text-5xl" role="img" aria-label={item.category_name ?? 'Menu item'}>
+            {style.emoji}
           </span>
         )}
 
         {/* Category badge */}
-        <span
-          className="absolute top-3 left-3 font-display tracking-widest text-xs px-3 py-1 rounded-full text-white shadow-sm"
-          style={{ backgroundColor: meta.color }}
-        >
-          {meta.label}
-        </span>
+        {item.category_name && (
+          <span
+            className="absolute top-3 left-3 font-display tracking-widest text-xs px-3 py-1 rounded-full text-white shadow-sm"
+            style={{ backgroundColor: style.color }}
+          >
+            {item.category_name}
+          </span>
+        )}
       </div>
 
       {/* Content */}
@@ -82,7 +90,31 @@ export function DrinkCard({ item }: DrinkCardProps) {
             </span>
           ))}
         </div>
+
+        {/* Add to order button — items that require picking flavors skip the
+            quick-add and just rely on the card being a link to the detail page */}
+        {onAddToOrder && !item.required_flavor_count && (
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onAddToOrder(item)
+            }}
+            className="mt-3 w-full py-2 rounded-full font-display tracking-widest text-sm text-white transition-all hover:opacity-90 active:scale-95"
+            style={{ backgroundColor: '#FF7B9D' }}
+          >
+            + ADD TO ORDER
+          </button>
+        )}
+        {onAddToOrder && !!item.required_flavor_count && (
+          <div
+            className="mt-3 w-full py-2 rounded-full font-display tracking-widest text-sm text-center"
+            style={{ backgroundColor: '#FFF8EE', color: '#2C2C2C' }}
+          >
+            CHOOSE FLAVORS →
+          </div>
+        )}
       </div>
-    </div>
+    </Link>
   )
 }

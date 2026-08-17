@@ -1,5 +1,6 @@
 import { createServerComponentClient } from '@/lib/supabase'
 import { MenuGrid } from '@/components/menu/MenuGrid'
+import { PickupCartBar } from '@/components/menu/PickupCartBar'
 import { WaveDivider } from '@/components/shared/WaveDivider'
 import { MenuItem } from '@/types/menu'
 import { MapPin, Phone, Clock } from 'lucide-react'
@@ -23,12 +24,12 @@ export default async function MarshallMenuPage() {
     .eq('slug', 'marshall')
     .single()
 
-  // Fetch menu items
+  // Fetch menu items — visible_menu_items already filters to available items
+  // whose Square category has been mapped + made visible in /admin/categories
   const { data: items } = await supabase
-    .from('menu_items')
+    .from('visible_menu_items')
     .select('*')
     .eq('location_id', location?.id ?? '')
-    .eq('is_available', true)
     .order('display_order', { ascending: true })
 
   const menuItems: MenuItem[] = (items ?? []) as MenuItem[]
@@ -80,10 +81,12 @@ export default async function MarshallMenuPage() {
 
       <WaveDivider fromColor="#9BBDCF" toColor="#FFF8EE" />
 
-      {/* Menu grid */}
-      <div className="max-w-6xl mx-auto px-4 pb-20">
-        <MenuGrid items={menuItems} locationName="Marshall" />
+      {/* Menu grid — pb-32 leaves room for the sticky cart bar */}
+      <div className="max-w-6xl mx-auto px-4 pb-32">
+        <MenuGrid items={menuItems} locationName="Marshall" showOrderButton />
       </div>
+
+      <PickupCartBar />
 
       {/* Order CTA */}
       <div className="py-12 px-4 text-center" style={{ backgroundColor: '#2C2C2C' }}>
