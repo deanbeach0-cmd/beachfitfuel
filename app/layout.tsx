@@ -13,11 +13,26 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'BeachFit Fuel',
     description: 'Fuel your day the fun way.',
-    url: process.env.NEXT_PUBLIC_APP_URL,
+    url: 'https://www.beachfitfuel.com',
     siteName: 'BeachFit Fuel',
     locale: 'en_US',
     type: 'website',
+    images: [
+      {
+        url: 'https://www.beachfitfuel.com/images/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'BeachFit Fuel — Low-cal, high-protein drinks that taste like a vacation.',
+      },
+    ],
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'BeachFit Fuel',
+    description: 'Fuel your day the fun way.',
+    images: ['https://www.beachfitfuel.com/images/og-image.png'],
+  },
+  metadataBase: new URL('https://www.beachfitfuel.com'),
 }
 
 export default function RootLayout({

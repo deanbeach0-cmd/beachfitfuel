@@ -3,8 +3,12 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'beachfitfuel.com' },
-      { protocol: 'https', hostname: 'images.printify.com' },
-      { protocol: 'https', hostname: '**.printify.com' },
+      { protocol: 'https', hostname: 'www.beachfitfuel.com' },
+      { protocol: 'https', hostname: '**.square.site' },
+      { protocol: 'https', hostname: '**.squareup.com' },
+      { protocol: 'https', hostname: '**.squarespace.com' },
+      { protocol: 'https', hostname: 'files.cdn.printful.com' },
+      { protocol: 'https', hostname: '**.cdn.printful.com' },
       { protocol: 'https', hostname: '**.supabase.co' },
     ],
   },

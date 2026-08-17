@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# Block internal API routes from indexing
+Disallow: /api/
+
+Sitemap: https://www.beachfitfuel.com/sitemap.xml
