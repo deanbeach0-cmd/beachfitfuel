@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Heart, Zap, Users } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -67,45 +68,57 @@ export default function OurStoryPage() {
         "aha moment" that led to the concept? Personal details make this
         section powerful — customers connect with real people, not brands.
       */}
-      <div className="max-w-3xl mx-auto px-4 py-20">
-        <div className="flex flex-col gap-8">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-1 rounded-full"
-              style={{ backgroundColor: '#FF7B9D' }}
-            />
-            <span className="font-display text-lg tracking-widest" style={{ color: '#FF7B9D' }}>
-              HOW IT STARTED
-            </span>
+      <div className="max-w-5xl mx-auto px-4 py-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div className="flex flex-col gap-8">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-1 rounded-full"
+                style={{ backgroundColor: '#FF7B9D' }}
+              />
+              <span className="font-display text-lg tracking-widest" style={{ color: '#FF7B9D' }}>
+                HOW IT STARTED
+              </span>
+            </div>
+
+            <h2 className="font-display text-4xl md:text-5xl tracking-wide text-dark leading-tight">
+              BORN FROM A PASSION FOR BETTER DRINKS
+            </h2>
+
+            <div className="flex flex-col gap-5 font-body text-dark/70 text-base leading-relaxed">
+              <p>
+                {/* TODO: Replace with Jennifer's real founding story */}
+                BeachFit Fuel started with a simple idea: what if your daily energy drink
+                actually tasted like a treat — and didn&apos;t cost you your health goals?
+                I was tired of choosing between drinks that were good for you and drinks
+                that actually tasted good. So I decided to make both exist in the same cup.
+              </p>
+              <p>
+                {/* TODO: Replace with Jennifer's personal story — where she was, what inspired the concept */}
+                I opened my doors in Marshall, Michigan and immediately felt the warmth of
+                this community. Neighbors became regulars, and regulars became family. The
+                &quot;beach&quot; in BeachFit Fuel isn&apos;t just a name — it&apos;s the
+                feeling I want every customer to walk away with: refreshed, fueled, and
+                just a little bit like they&apos;re on vacation.
+              </p>
+              <p>
+                {/* TODO: Replace with Jennifer's expansion story / vision */}
+                Now, with a Battle Creek location on the horizon, I&apos;m just getting
+                started. The goal has always been the same: bring the best-tasting,
+                best-for-you specialty drinks to as many people as possible — one beach bomb
+                at a time.
+              </p>
+            </div>
           </div>
 
-          <h2 className="font-display text-4xl md:text-5xl tracking-wide text-dark leading-tight">
-            BORN FROM A PASSION FOR BETTER DRINKS
-          </h2>
-
-          <div className="flex flex-col gap-5 font-body text-dark/70 text-base leading-relaxed">
-            <p>
-              {/* TODO: Replace with Jennifer's real founding story */}
-              BeachFit Fuel started with a simple idea: what if your daily energy drink
-              actually tasted like a treat — and didn&apos;t cost you your health goals?
-              I was tired of choosing between drinks that were good for you and drinks
-              that actually tasted good. So I decided to make both exist in the same cup.
-            </p>
-            <p>
-              {/* TODO: Replace with Jennifer's personal story — where she was, what inspired the concept */}
-              I opened my doors in Marshall, Michigan and immediately felt the warmth of
-              this community. Neighbors became regulars, and regulars became family. The
-              &quot;beach&quot; in BeachFit Fuel isn&apos;t just a name — it&apos;s the
-              feeling I want every customer to walk away with: refreshed, fueled, and
-              just a little bit like they&apos;re on vacation.
-            </p>
-            <p>
-              {/* TODO: Replace with Jennifer's expansion story / vision */}
-              Now, with a Battle Creek location on the horizon, I&apos;m just getting
-              started. The goal has always been the same: bring the best-tasting,
-              best-for-you specialty drinks to as many people as possible — one beach bomb
-              at a time.
-            </p>
+          <div className="relative aspect-[4/5] rounded-3xl overflow-hidden shadow-lg">
+            <Image
+              src="/images/founder_1.jpg"
+              alt="Jennifer, founder of BeachFit Fuel"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
           </div>
         </div>
       </div>
@@ -203,6 +216,15 @@ export default function OurStoryPage() {
           <h2 className="font-display text-3xl md:text-4xl tracking-wide text-dark">
             FIND US IN MICHIGAN
           </h2>
+          <div className="relative w-full max-w-xl aspect-video rounded-3xl overflow-hidden shadow-lg">
+            <Image
+              src="/images/Marshall_storefront.jpg"
+              alt="BeachFit Fuel storefront in Marshall, MI"
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, 576px"
+            />
+          </div>
           <div className="flex flex-col sm:flex-row gap-6 w-full max-w-xl">
             <div
               className="flex-1 rounded-2xl p-5 text-center"

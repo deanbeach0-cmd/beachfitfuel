@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { Instagram, Facebook } from 'lucide-react'
 
 const SOCIAL_HANDLES = [
@@ -28,12 +29,11 @@ const SOCIAL_HANDLES = [
   },
 ]
 
-// Placeholder post colors that suggest drink photos
-const PLACEHOLDER_POSTS = [
-  { bg: '#FF7B9D', label: '🏖️' },
-  { bg: '#FAB65F', label: '🥤' },
-  { bg: '#9BBDCF', label: '🌴' },
-  { bg: '#6FBDB8', label: '💪' },
+const FEATURED_POSTS = [
+  { src: '/images/Dirty_Sodas.jpg', alt: 'Lineup of BeachFit Fuel dirty sodas' },
+  { src: '/images/BeachBombs_Carrier.jpg', alt: 'A carrier of colorful BeachFit Fuel drinks' },
+  { src: '/images/Multiple_drinks_deliverd.jpg', alt: 'BeachFit Fuel team member with a drink carrier outside the shop' },
+  { src: '/images/Team_Lifestyle.jpg', alt: 'The BeachFit Fuel team holding up drinks' },
 ]
 
 export function SocialFeed() {
@@ -71,18 +71,25 @@ export function SocialFeed() {
           ))}
         </div>
 
-        {/* Placeholder post grid */}
+        {/* Featured post grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {PLACEHOLDER_POSTS.map((post, i) => (
+          {FEATURED_POSTS.map((post) => (
             <div
-              key={i}
-              className="aspect-square rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] transition-transform shadow-sm"
-              style={{ backgroundColor: post.bg }}
+              key={post.src}
+              className="relative aspect-square rounded-2xl overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform shadow-sm"
             >
-              <span className="text-4xl">{post.label}</span>
-              <span className="font-display text-white tracking-widest text-xs opacity-70">
-                @BEACHFITFUEL
-              </span>
+              <Image
+                src={post.src}
+                alt={post.alt}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 50vw, 25vw"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-3 py-2">
+                <span className="font-display text-white tracking-widest text-xs">
+                  @BEACHFITFUEL
+                </span>
+              </div>
             </div>
           ))}
         </div>

@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { createServerComponentClient } from '@/lib/supabase'
 import { Ticker } from '@/components/home/Ticker'
@@ -40,14 +41,22 @@ export default async function HomePage() {
   const menuPreviewItems = (featuredItems ?? []) as MenuItem[]
 
   // Real to-go pack bundles — pickup ordering with the flavor picker, not shipping
-  const SHOP_PRODUCTS = [
+  const SHOP_PRODUCTS: {
+    name: string
+    description: string
+    price: string
+    color: string
+    image?: string
+    emoji?: string
+    href: string
+    comingSoon: boolean
+  }[] = [
     {
       name: '5 To-Go Packs',
       description: 'Pick 5 flavors. Ready for pickup at Marshall.',
       price: '$20',
-      badge: null,
       color: '#9BBDCF',
-      emoji: '🏖️',
+      image: '/images/to_go_pack_1.png',
       href: '/menu/marshall/5dff19c8-200a-4557-9a86-e2961c040dca',
       comingSoon: false,
     },
@@ -55,9 +64,8 @@ export default async function HomePage() {
       name: '10 To-Go Packs',
       description: 'Pick 10 flavors. Ready for pickup at Marshall.',
       price: '$40',
-      badge: null,
       color: '#FAB65F',
-      emoji: '🎉',
+      image: '/images/to_go_pack_2.png',
       href: '/menu/marshall/c2f538d0-972f-4c13-99d6-7e52198312f5',
       comingSoon: false,
     },
@@ -65,7 +73,6 @@ export default async function HomePage() {
       name: 'BFF Apparel',
       description: 'Hats, tees, and hoodies. Rep the beach wherever you are.',
       price: '',
-      badge: null,
       color: '#FF7B9D',
       emoji: '👕',
       href: '/shop/apparel',
@@ -131,7 +138,17 @@ export default async function HomePage() {
                   className="h-36 flex items-center justify-center relative"
                   style={{ backgroundColor: product.color + '33' }}
                 >
-                  <span className="text-6xl">{product.emoji}</span>
+                  {product.image ? (
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 100vw, 33vw"
+                    />
+                  ) : (
+                    <span className="text-6xl">{product.emoji}</span>
+                  )}
                   {product.comingSoon && (
                     <span
                       className="absolute top-3 right-3 font-display tracking-widest text-xs px-3 py-1 rounded-full text-white"
@@ -215,11 +232,14 @@ export default async function HomePage() {
           >
             <div className="flex flex-col items-center gap-4 p-2">
               <div className="flex items-center gap-4">
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-                >
-                  👩
+                <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
+                  <Image
+                    src="/images/founder_2.jpg"
+                    alt="Jennifer, Founder of BeachFit Fuel"
+                    fill
+                    className="object-cover"
+                    sizes="56px"
+                  />
                 </div>
                 <div className="text-left">
                   <p className="font-display text-xl tracking-widest text-white">JENNIFER</p>

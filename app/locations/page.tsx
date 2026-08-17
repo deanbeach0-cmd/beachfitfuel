@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Phone, Clock, Navigation, Zap } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -66,6 +67,17 @@ export default function LocationsPage() {
             >
               ● OPEN
             </span>
+          </div>
+
+          {/* Storefront photo */}
+          <div className="relative w-full aspect-[21/9]">
+            <Image
+              src="/images/Marshall_storefront.jpg"
+              alt="BeachFit Fuel storefront in Marshall, MI"
+              fill
+              className="object-cover"
+              sizes="(max-width: 1024px) 100vw, 896px"
+            />
           </div>
 
           {/* Card body */}
