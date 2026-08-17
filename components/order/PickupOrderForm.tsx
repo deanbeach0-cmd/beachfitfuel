@@ -9,7 +9,6 @@ import type { PickupCustomer, PickupTime } from '@/types/pickup'
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Square?: any
   }
 }
@@ -41,7 +40,6 @@ export function PickupOrderForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cardRef = useRef<any>(null)
   const cardContainerRef = useRef<HTMLDivElement>(null)
 

@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation'
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Square?: any
   }
 }
@@ -62,7 +61,6 @@ export function CheckoutForm() {
 
   useEffect(() => { setMounted(true) }, [])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cardRef = useRef<any>(null)
   const cardContainerRef = useRef<HTMLDivElement>(null)
 
