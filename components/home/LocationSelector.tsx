@@ -2,9 +2,9 @@ import Link from 'next/link'
 import { MapPin, Phone, Clock, Zap, PalmtreeIcon } from 'lucide-react'
 
 const MARSHALL_HOURS = [
-  { day: 'Mon – Fri', hours: '7:00 AM – 6:00 PM' },
-  { day: 'Saturday',  hours: '8:00 AM – 5:00 PM' },
-  { day: 'Sunday',    hours: '9:00 AM – 3:00 PM' },
+  { day: 'Mon – Fri', hours: '6:00 AM – 4:30 PM' },
+  { day: 'Saturday',  hours: '9:00 AM – 3:30 PM' },
+  { day: 'Sunday',    hours: 'Closed' },
 ]
 
 export function LocationSelector() {
@@ -63,10 +63,10 @@ export function LocationSelector() {
                 <div className="flex items-center gap-3">
                   <Phone size={18} className="flex-shrink-0" style={{ color: '#6FBDB8' }} />
                   <a
-                    href="tel:+12695580000"
+                    href="tel:+12692343645"
                     className="font-body text-dark hover:text-teal transition-colors"
                   >
-                    (269) 558-0000
+                    (269) 234-3645
                   </a>
                 </div>
 

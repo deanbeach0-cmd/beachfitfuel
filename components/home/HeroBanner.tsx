@@ -4,15 +4,11 @@ import Link from 'next/link'
 // Inline SVG palm tree pattern encoded as a data URI background
 const PALM_PATTERN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='110'%3E%3Cpath d='M45,110 C44,88 42,70 45,56 C34,50 18,48 8,52 C20,46 34,52 45,56 C47,40 62,34 74,35 C62,40 48,50 45,56 C40,36 42,18 44,8 C45,26 44,46 45,56 C49,38 60,26 72,22 C60,32 47,48 45,56' fill='white'/%3E%3C/svg%3E")`
 
-const pills = [
-  { label: 'Beach Bombs',    href: '/menu/marshall?category=beach_bomb' },
-  { label: 'Protein Shakes', href: '/menu/marshall?category=protein_shake' },
-  { label: 'Blenders',       href: '/menu/marshall?category=blender' },
-  { label: 'Energy Drinks',  href: '/menu/marshall?category=energy_drink' },
-  { label: 'Food',           href: '/menu/marshall?category=food' },
-]
+interface HeroBannerProps {
+  categories: string[]
+}
 
-export function HeroBanner() {
+export function HeroBanner({ categories }: HeroBannerProps) {
   return (
     <section
       className="relative overflow-hidden"
@@ -30,20 +26,17 @@ export function HeroBanner() {
 
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 flex flex-col items-center text-center gap-8">
 
-        {/* Logo card with dotted border */}
-        <div
-          className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl"
-          style={{ border: '3px dotted rgba(255,255,255,0.7)' }}
-        >
-          <Image
-            src="/images/logo.png"
-            alt="BeachFit Fuel"
-            width={200}
-            height={80}
-            className="h-16 md:h-20 w-auto object-contain"
-            priority
-          />
-        </div>
+        {/* Logo — source PNG has a solid white background; multiply-blend it
+            away so only the dark mark shows against the hero background. */}
+        <Image
+          src="/images/logo.png"
+          alt="BeachFit Fuel"
+          width={280}
+          height={280}
+          className="h-32 sm:h-40 md:h-48 w-auto object-contain"
+          style={{ mixBlendMode: 'multiply' }}
+          priority
+        />
 
         {/* Headline */}
         <div className="space-y-3">
@@ -53,7 +46,7 @@ export function HeroBanner() {
           >
             FUEL YOUR DAY
             <br />
-            THE FUN WAY
+            THE BEACHFIT WAY
           </h1>
           <p className="font-body text-white/90 text-lg md:text-xl max-w-xl mx-auto font-600">
             Low-cal, high-protein drinks that taste like a vacation.
@@ -85,17 +78,19 @@ export function HeroBanner() {
         </div>
 
         {/* Drink category pills */}
-        <div className="flex flex-wrap justify-center gap-3 max-w-2xl">
-          {pills.map((pill) => (
-            <Link
-              key={pill.label}
-              href={pill.href}
-              className="font-body font-700 text-sm px-5 py-2 rounded-full bg-white/25 text-white hover:bg-white/40 transition-colors backdrop-blur-sm border border-white/40"
-            >
-              {pill.label}
-            </Link>
-          ))}
-        </div>
+        {categories.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-3 max-w-2xl">
+            {categories.map((name) => (
+              <Link
+                key={name}
+                href={`/menu/marshall?category=${encodeURIComponent(name)}`}
+                className="font-body font-700 text-sm px-5 py-2 rounded-full bg-white/25 text-white hover:bg-white/40 transition-colors backdrop-blur-sm border border-white/40"
+              >
+                {name}
+              </Link>
+            ))}
+          </div>
+        )}
 
       </div>
     </section>

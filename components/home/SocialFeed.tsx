@@ -3,8 +3,8 @@ import { Instagram, Facebook } from 'lucide-react'
 const SOCIAL_HANDLES = [
   {
     platform: 'Instagram',
-    handle: '@beachfitfuel',
-    href: 'https://instagram.com/beachfitfuel',
+    handle: '@Beachfit_fuel',
+    href: 'https://instagram.com/beachfit_fuel',
     icon: <Instagram size={20} />,
     color: '#FF7B9D',
   },
@@ -87,8 +87,8 @@ export function SocialFeed() {
           ))}
         </div>
 
-        <p className="text-center font-body text-dark/40 text-sm mt-6">
-          Social feed integration coming soon — follow us to stay in the loop!
+        <p className="text-center font-body text-dark/50 text-sm mt-6">
+          New flavor drops, giveaways, and way too many beach puns. 🌴 Follow along so you don&apos;t miss out.
         </p>
 
       </div>

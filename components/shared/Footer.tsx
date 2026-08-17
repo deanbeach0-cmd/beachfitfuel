@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { MapPin, Phone, Instagram, Facebook } from 'lucide-react'
 
 const quickLinks = [
@@ -23,14 +22,6 @@ export function Footer() {
 
           {/* Column 1 — Brand */}
           <div className="flex flex-col gap-4">
-            <div className="relative h-12 w-36">
-              <Image
-                src="/images/logo.png"
-                alt="BeachFit Fuel"
-                fill
-                className="object-contain object-left brightness-0 invert"
-              />
-            </div>
             <p className="font-display text-2xl tracking-widest text-white leading-tight">
               BEACHFIT FUEL
             </p>
@@ -41,7 +32,7 @@ export function Footer() {
             {/* Social */}
             <div className="flex gap-4 mt-2">
               <a
-                href="https://instagram.com/beachfitfuel"
+                href="https://instagram.com/beachfit_fuel"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram"
@@ -125,8 +116,8 @@ export function Footer() {
                 </div>
                 <div className="flex items-center gap-2 text-white/60 text-sm">
                   <Phone size={14} className="flex-shrink-0 text-[#6FBDB8]" />
-                  <a href="tel:+12695580000" className="font-body hover:text-white transition-colors">
-                    (269) 558-0000
+                  <a href="tel:+12692343645" className="font-body hover:text-white transition-colors">
+                    (269) 234-3645
                   </a>
                 </div>
               </div>

@@ -1,5 +1,5 @@
-import Image from 'next/image'
 import Link from 'next/link'
+import { createServerComponentClient } from '@/lib/supabase'
 import { Ticker } from '@/components/home/Ticker'
 import { HeroBanner } from '@/components/home/HeroBanner'
 import { LocationSelector } from '@/components/home/LocationSelector'
@@ -8,6 +8,7 @@ import { SocialFeed } from '@/components/home/SocialFeed'
 import { WaveDivider } from '@/components/shared/WaveDivider'
 import { DottedCard } from '@/components/shared/DottedCard'
 import { NewsletterForm } from '@/components/home/NewsletterForm'
+import { MenuItem } from '@/types/menu'
 
 // Hibiscus SVG pattern for the shop/pink section
 const HIBISCUS_PATTERN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='70'%3E%3Cg fill='white'%3E%3Cellipse cx='35' cy='18' rx='8' ry='14' transform='rotate(0 35 35)'/%3E%3Cellipse cx='35' cy='18' rx='8' ry='14' transform='rotate(72 35 35)'/%3E%3Cellipse cx='35' cy='18' rx='8' ry='14' transform='rotate(144 35 35)'/%3E%3Cellipse cx='35' cy='18' rx='8' ry='14' transform='rotate(216 35 35)'/%3E%3Cellipse cx='35' cy='18' rx='8' ry='14' transform='rotate(288 35 35)'/%3E%3Ccircle cx='35' cy='35' r='5'/%3E%3C/g%3E%3C/svg%3E")`
@@ -15,44 +16,70 @@ const HIBISCUS_PATTERN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
 // Palm tree pattern (same as hero) for sky sections
 const PALM_PATTERN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='110'%3E%3Cpath d='M45,110 C44,88 42,70 45,56 C34,50 18,48 8,52 C20,46 34,52 45,56 C47,40 62,34 74,35 C62,40 48,50 45,56 C40,36 42,18 44,8 C45,26 44,46 45,56 C49,38 60,26 72,22 C60,32 47,48 45,56' fill='white'/%3E%3C/svg%3E")`
 
-const SHOP_PRODUCTS = [
-  {
-    name: 'Beach Bomb To-Go Pack',
-    description: '12 individual beach bomb pouches — just add water. All your favorite flavors.',
-    price: '$24.99',
-    badge: null,
-    color: '#9BBDCF',
-    emoji: '🏖️',
-    href: '/shop/to-go-packs',
-  },
-  {
-    name: 'Variety Bundle',
-    description: '24 pouches with a mix of all flavors. Best value for the whole family.',
-    price: '$49.99',
-    badge: 'SAVE 15%',
-    color: '#FAB65F',
-    emoji: '🎉',
-    href: '/shop/to-go-packs',
-  },
-  {
-    name: 'BFF Apparel',
-    description: 'Hats, tees, and hoodies. Rep the beach wherever you are.',
-    price: 'From $22',
-    badge: null,
-    color: '#FF7B9D',
-    emoji: '👕',
-    href: '/shop/apparel',
-  },
-]
+export default async function HomePage() {
+  const supabase = await createServerComponentClient()
 
-export default function HomePage() {
+  const { data: visibleCategories } = await supabase
+    .from('square_categories')
+    .select('square_category_name')
+    .eq('is_visible', true)
+    .order('square_category_name', { ascending: true })
+
+  const heroCategories = Array.from(
+    new Set((visibleCategories ?? []).map((c) => c.square_category_name))
+  )
+
+  const { data: location } = await supabase.from('locations').select('id').eq('slug', 'marshall').single()
+  const { data: featuredItems } = await supabase
+    .from('visible_menu_items')
+    .select('*')
+    .eq('location_id', location?.id ?? '')
+    .order('display_order', { ascending: true })
+    .limit(6)
+
+  const menuPreviewItems = (featuredItems ?? []) as MenuItem[]
+
+  // Real to-go pack bundles — pickup ordering with the flavor picker, not shipping
+  const SHOP_PRODUCTS = [
+    {
+      name: '5 To-Go Packs',
+      description: 'Pick 5 flavors. Ready for pickup at Marshall.',
+      price: '$20',
+      badge: null,
+      color: '#9BBDCF',
+      emoji: '🏖️',
+      href: '/menu/marshall/5dff19c8-200a-4557-9a86-e2961c040dca',
+      comingSoon: false,
+    },
+    {
+      name: '10 To-Go Packs',
+      description: 'Pick 10 flavors. Ready for pickup at Marshall.',
+      price: '$40',
+      badge: null,
+      color: '#FAB65F',
+      emoji: '🎉',
+      href: '/menu/marshall/c2f538d0-972f-4c13-99d6-7e52198312f5',
+      comingSoon: false,
+    },
+    {
+      name: 'BFF Apparel',
+      description: 'Hats, tees, and hoodies. Rep the beach wherever you are.',
+      price: '',
+      badge: null,
+      color: '#FF7B9D',
+      emoji: '👕',
+      href: '/shop/apparel',
+      comingSoon: true,
+    },
+  ]
+
   return (
     <>
       {/* 1 — Ticker */}
       <Ticker />
 
       {/* 2 — Hero */}
-      <HeroBanner />
+      <HeroBanner categories={heroCategories} />
 
       {/* 3 — Wave: sky → white */}
       <WaveDivider fromColor="#9BBDCF" toColor="#ffffff" />
@@ -64,7 +91,7 @@ export default function HomePage() {
       <WaveDivider fromColor="#ffffff" toColor="#FFF8EE" />
 
       {/* 6 — Menu preview */}
-      <FeaturedDrinks />
+      <FeaturedDrinks items={menuPreviewItems} />
 
       {/* 7 — Wave: cream → pink */}
       <WaveDivider fromColor="#FFF8EE" toColor="#FF7B9D" />
@@ -83,13 +110,13 @@ export default function HomePage() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10">
             <span className="font-body font-800 text-sm tracking-[0.2em] uppercase text-white/70">
-              Ship Anywhere
+              Pack & Go
             </span>
             <h2 className="font-display text-4xl md:text-5xl tracking-wide text-white mt-2">
               TAKE THE BEACH HOME
             </h2>
             <p className="font-body text-white/80 mt-2 text-base">
-              To-go packs ship nationwide. Apparel to rep the vibe.
+              To-go packs ready for pickup in Marshall. Apparel coming soon.
             </p>
           </div>
 
@@ -105,12 +132,12 @@ export default function HomePage() {
                   style={{ backgroundColor: product.color + '33' }}
                 >
                   <span className="text-6xl">{product.emoji}</span>
-                  {product.badge && (
+                  {product.comingSoon && (
                     <span
                       className="absolute top-3 right-3 font-display tracking-widest text-xs px-3 py-1 rounded-full text-white"
                       style={{ backgroundColor: '#EC8A1E' }}
                     >
-                      {product.badge}
+                      COMING SOON
                     </span>
                   )}
                 </div>
@@ -120,20 +147,31 @@ export default function HomePage() {
                     <h3 className="font-display text-xl tracking-wide text-dark leading-tight">
                       {product.name}
                     </h3>
-                    <span className="font-display text-lg flex-shrink-0" style={{ color: '#EC8A1E' }}>
-                      {product.price}
-                    </span>
+                    {product.price && (
+                      <span className="font-display text-lg flex-shrink-0" style={{ color: '#EC8A1E' }}>
+                        {product.price}
+                      </span>
+                    )}
                   </div>
                   <p className="font-body text-sm text-dark/60 leading-relaxed flex-1">
                     {product.description}
                   </p>
-                  <Link
-                    href={product.href}
-                    className="block w-full text-center font-display tracking-widest text-sm py-2.5 rounded-full text-white mt-auto transition-transform hover:scale-[1.02]"
-                    style={{ backgroundColor: product.color }}
-                  >
-                    SHOP NOW
-                  </Link>
+                  {product.comingSoon ? (
+                    <span
+                      className="block w-full text-center font-display tracking-widest text-sm py-2.5 rounded-full text-dark/40 mt-auto"
+                      style={{ backgroundColor: '#f3f3f3' }}
+                    >
+                      COMING SOON
+                    </span>
+                  ) : (
+                    <Link
+                      href={product.href}
+                      className="block w-full text-center font-display tracking-widest text-sm py-2.5 rounded-full text-white mt-auto transition-transform hover:scale-[1.02]"
+                      style={{ backgroundColor: product.color }}
+                    >
+                      ORDER NOW
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
@@ -181,15 +219,15 @@ export default function HomePage() {
                   className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
                   style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
                 >
-                  👫
+                  👩
                 </div>
                 <div className="text-left">
-                  <p className="font-display text-xl tracking-widest text-white">DEAN & JENNIFER</p>
-                  <p className="font-body text-white/70 text-sm">Founders, BeachFit Fuel</p>
+                  <p className="font-display text-xl tracking-widest text-white">JENNIFER</p>
+                  <p className="font-body text-white/70 text-sm">Founder, BeachFit Fuel</p>
                 </div>
               </div>
               <p className="font-body text-white/90 text-base md:text-lg leading-relaxed italic">
-                &ldquo;We started BeachFit Fuel because we wanted drinks that taste amazing and make
+                &ldquo;I started BeachFit Fuel because I wanted drinks that taste amazing and make
                 you feel amazing — without all the junk. Michigan deserves a beach vibe,
                 even when it&apos;s snowing outside.&rdquo;
               </p>
@@ -201,7 +239,7 @@ export default function HomePage() {
             {[
               { value: '4+',    label: 'Years in Business' },
               { value: '2',     label: 'Locations' },
-              { value: '20+',   label: 'Menu Items' },
+              { value: '50+',   label: 'Menu Items' },
               { value: '1000s', label: 'Happy Customers' },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col items-center gap-1">

@@ -1,7 +1,8 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { MobileMenu } from './MobileMenu'
+import { CartIcon } from '@/components/shop/CartIcon'
+import { PickupCartIcon } from '@/components/order/PickupCartIcon'
 
 const navLinks = [
   { href: '/menu',      label: 'MENU' },
@@ -16,19 +17,10 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
-          {/* Logo */}
-          <Link href="/" className="flex-shrink-0 flex items-center gap-2 min-w-0">
-            <div className="relative h-10 w-32 flex-shrink-0">
-              <Image
-                src="/images/logo.png"
-                alt="BeachFit Fuel"
-                fill
-                className="object-contain object-left"
-                priority
-              />
-            </div>
-            <span className="font-display text-xl tracking-widest text-dark leading-none hidden xs:block">
-              BEACHFIT FUEL
+          {/* Logo — a small wordmark reads clearer at nav scale than the full mark image */}
+          <Link href="/" className="flex-shrink-0 flex items-center min-w-0">
+            <span className="font-display text-2xl sm:text-3xl tracking-widest text-dark leading-none">
+              BEACHFIT <span style={{ color: '#FF7B9D' }}>FUEL</span>
             </span>
           </Link>
 
@@ -45,9 +37,11 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* ORDER CTA + mobile hamburger */}
-          <div className="flex items-center gap-3">
-            <Link href="/menu" className="hidden sm:block">
+          {/* ORDER CTA + carts + mobile hamburger */}
+          <div className="flex items-center gap-1">
+            <PickupCartIcon />
+            <CartIcon />
+            <Link href="/menu" className="hidden sm:block ml-2">
               <Button
                 className="font-display tracking-widest text-base px-5 rounded-full text-white"
                 style={{ backgroundColor: '#FF7B9D' }}
