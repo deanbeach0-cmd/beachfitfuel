@@ -420,7 +420,7 @@ export function PickupOrderForm() {
             </div>
             <div className="flex justify-between">
               <span className="font-body text-dark/50 text-sm">Pickup at</span>
-              <span className="font-body text-sm text-right">209 W Michigan Ave</span>
+              <span className="font-body text-sm text-right">205 W Michigan Ave</span>
             </div>
           </div>
 

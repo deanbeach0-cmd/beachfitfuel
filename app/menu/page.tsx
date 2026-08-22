@@ -39,7 +39,7 @@ export default function MenuLanding() {
               <PalmtreeIcon size={24} className="text-white flex-shrink-0" />
               <div>
                 <p className="font-display text-2xl tracking-widest text-white leading-none">MARSHALL</p>
-                <p className="font-body text-white/80 text-sm mt-0.5">209 W Michigan Ave</p>
+                <p className="font-body text-white/80 text-sm mt-0.5">205 W Michigan Ave</p>
               </div>
               <span className="ml-auto font-body text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: 'white', color: '#6FBDB8' }}>
                 ● OPEN

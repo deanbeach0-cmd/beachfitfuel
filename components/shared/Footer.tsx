@@ -112,7 +112,7 @@ export function Footer() {
                 <p className="font-display text-base tracking-widest text-white">MARSHALL</p>
                 <div className="flex items-start gap-2 text-white/60 text-sm">
                   <MapPin size={14} className="mt-0.5 flex-shrink-0 text-[#6FBDB8]" />
-                  <span className="font-body">209 W Michigan Ave<br />Marshall, MI</span>
+                  <span className="font-body">205 W Michigan Ave<br />Marshall, MI</span>
                 </div>
                 <div className="flex items-center gap-2 text-white/60 text-sm">
                   <Phone size={14} className="flex-shrink-0 text-[#6FBDB8]" />

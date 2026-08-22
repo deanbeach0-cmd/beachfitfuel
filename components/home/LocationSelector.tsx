@@ -54,7 +54,7 @@ export function LocationSelector() {
                 <div className="flex items-start gap-3">
                   <MapPin size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#6FBDB8' }} />
                   <div>
-                    <p className="font-body font-700 text-dark">209 W Michigan Ave</p>
+                    <p className="font-body font-700 text-dark">205 W Michigan Ave</p>
                     <p className="font-body text-dark/60 text-sm">Marshall, MI 49068</p>
                   </div>
                 </div>

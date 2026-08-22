@@ -231,7 +231,7 @@ export default function OurStoryPage() {
               style={{ backgroundColor: 'white', border: '1.5px solid #9BBDCF44' }}
             >
               <p className="font-display text-xl tracking-widest text-dark">MARSHALL</p>
-              <p className="font-body text-dark/60 text-sm mt-1">209 W Michigan Ave</p>
+              <p className="font-body text-dark/60 text-sm mt-1">205 W Michigan Ave</p>
               <p className="font-body text-dark/40 text-xs mt-0.5">Open Now</p>
             </div>
             <div

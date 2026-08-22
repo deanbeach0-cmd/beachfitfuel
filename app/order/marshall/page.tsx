@@ -40,7 +40,7 @@ export default function MarshallOrderPage() {
             <div className="flex flex-wrap gap-3">
               <div className="flex items-center gap-2 bg-white/20 rounded-full px-4 py-2">
                 <MapPin size={14} className="text-white/80" />
-                <span className="font-body text-white/90 text-sm">209 W Michigan Ave</span>
+                <span className="font-body text-white/90 text-sm">205 W Michigan Ave</span>
               </div>
               <a
                 href="tel:+12692343645"
@@ -98,11 +98,11 @@ export default function MarshallOrderPage() {
               <h3 className="font-display text-lg tracking-widests text-dark">LOCATION</h3>
             </div>
             <div className="flex flex-col gap-1">
-              <p className="font-body font-700 text-dark text-sm">209 W Michigan Ave</p>
+              <p className="font-body font-700 text-dark text-sm">205 W Michigan Ave</p>
               <p className="font-body text-dark/60 text-sm">Marshall, MI 49068</p>
             </div>
             <a
-              href="https://maps.google.com/?q=209+W+Michigan+Ave+Marshall+MI+49068"
+              href="https://maps.google.com/?q=205+W+Michigan+Ave+Marshall+MI+49068"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full text-center font-display tracking-widest text-sm py-3 rounded-full text-white transition-transform hover:scale-[1.02] block"

@@ -61,7 +61,7 @@ export default async function MarshallMenuPage() {
             <div className="flex flex-wrap gap-3">
               <div className="flex items-center gap-2 bg-white/20 rounded-full px-4 py-2">
                 <MapPin size={14} className="text-white/80" />
-                <span className="font-body text-white/90 text-sm">209 W Michigan Ave</span>
+                <span className="font-body text-white/90 text-sm">205 W Michigan Ave</span>
               </div>
               <a
                 href="tel:+12692343645"

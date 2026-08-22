@@ -70,7 +70,7 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
             <div className="flex items-start gap-2">
               <MapPin size={14} className="text-dark/40 mt-0.5 flex-shrink-0" />
               <span className="font-body text-dark/60 text-sm">
-                209 W Michigan Ave, Marshall, MI 49068
+                205 W Michigan Ave, Marshall, MI 49068
               </span>
             </div>
             <div className="flex items-center gap-2">

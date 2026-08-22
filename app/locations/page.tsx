@@ -89,7 +89,7 @@ export default function LocationsPage() {
                 <div className="flex items-start gap-3">
                   <MapPin size={18} className="mt-0.5 flex-shrink-0" style={{ color: '#9BBDCF' }} />
                   <div>
-                    <p className="font-body font-700 text-dark">209 W Michigan Ave</p>
+                    <p className="font-body font-700 text-dark">205 W Michigan Ave</p>
                     <p className="font-body text-dark/60">Marshall, MI 49068</p>
                   </div>
                 </div>
@@ -106,7 +106,7 @@ export default function LocationsPage() {
 
               <div className="flex flex-col gap-3">
                 <a
-                  href="https://maps.google.com/?q=209+W+Michigan+Ave+Marshall+MI+49068"
+                  href="https://maps.google.com/?q=205+W+Michigan+Ave+Marshall+MI+49068"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 font-display tracking-widest text-sm py-3 px-6 rounded-full text-white transition-transform hover:scale-[1.02]"

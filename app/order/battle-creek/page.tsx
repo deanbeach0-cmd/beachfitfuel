@@ -103,7 +103,7 @@ export default function BattleCreekOrderPage() {
             </div>
             <div className="flex items-center gap-2 mt-2 text-dark/40">
               <MapPin size={14} />
-              <span className="font-body text-sm">209 W Michigan Ave, Marshall, MI</span>
+              <span className="font-body text-sm">205 W Michigan Ave, Marshall, MI</span>
             </div>
           </div>
         </div>
