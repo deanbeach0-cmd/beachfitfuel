@@ -24,6 +24,7 @@ const PICKUP_TIMES: { value: PickupTime; label: string }[] = [
 const EMPTY_CUSTOMER: PickupCustomer = {
   name: '',
   phone: '',
+  email: '',
   pickupTime: 'ASAP',
   note: '',
 }
@@ -123,8 +124,8 @@ export function PickupOrderForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!customer.name || !customer.phone) {
-      setError('Please enter your name and phone number.')
+    if (!customer.name || !customer.phone || !customer.email) {
+      setError('Please enter your name, phone number, and email.')
       return
     }
     if (payNow && (!cardRef.current || !cardReady)) {
@@ -276,6 +277,17 @@ export function PickupOrderForm() {
                 value={customer.phone}
                 onChange={(e) => setCustomer((c) => ({ ...c, phone: e.target.value }))}
                 placeholder="(555) 555-5555"
+                required
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block font-body text-sm font-bold text-dark mb-1">Email *</label>
+              <input
+                type="email"
+                value={customer.email}
+                onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
+                placeholder="you@example.com"
                 required
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
               />

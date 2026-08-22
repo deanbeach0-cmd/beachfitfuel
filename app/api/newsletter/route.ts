@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerComponentClient } from '@/lib/supabase'
+import { resend, FROM_EMAIL } from '@/lib/resend'
+import { newsletterWelcomeEmail } from '@/lib/email-templates'
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -25,6 +27,14 @@ export async function POST(request: Request) {
     }
     console.error('Newsletter signup error:', error)
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
+  }
+
+  // Only send the welcome email on a genuinely new signup, never a resubmit.
+  try {
+    const { subject, html } = newsletterWelcomeEmail({ firstName })
+    await resend.emails.send({ from: FROM_EMAIL, to: email, subject, html })
+  } catch (err) {
+    console.error('[newsletter] Welcome email failed', err)
   }
 
   return NextResponse.json({ message: "You're on the list! Expect good vibes in your inbox. 🌴" })

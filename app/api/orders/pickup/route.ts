@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { squareClient, LOCATION_IDS } from '@/lib/square'
+import { resend, FROM_EMAIL } from '@/lib/resend'
+import { pickupOrderConfirmationEmail } from '@/lib/email-templates'
 import type { PickupCartItem, PickupCustomer } from '@/types/pickup'
 
 interface PickupOrderRequest {
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   const { sourceId, items, customer, totalCents } = body
 
-  if (!items?.length || !customer?.name || !customer?.phone || !totalCents) {
+  if (!items?.length || !customer?.name || !customer?.phone || !customer?.email || !totalCents) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -103,6 +105,27 @@ export async function POST(request: NextRequest) {
       const msg = err instanceof Error ? err.message : 'Payment failed'
       return NextResponse.json({ error: msg }, { status: 402 })
     }
+  }
+
+  // Step 3: Send confirmation email — never let a failed send fail the order,
+  // since payment/order creation already succeeded by this point.
+  try {
+    const { subject, html } = pickupOrderConfirmationEmail({
+      customerName: customer.name,
+      orderId,
+      items: items.map((i) => ({
+        name: i.name,
+        quantity: i.quantity,
+        priceCents: i.priceCents,
+        flavors: i.flavors,
+      })),
+      totalCents,
+      pickupTime: customer.pickupTime,
+      paidOnline: !!sourceId,
+    })
+    await resend.emails.send({ from: FROM_EMAIL, to: customer.email, subject, html })
+  } catch (err) {
+    console.error('[orders/pickup] Confirmation email failed', err)
   }
 
   return NextResponse.json({

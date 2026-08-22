@@ -19,6 +19,7 @@ export type PickupTime = 'ASAP' | '15min' | '30min' | '45min' | '1hr'
 export interface PickupCustomer {
   name: string
   phone: string
+  email: string
   pickupTime: PickupTime
   note: string
 }

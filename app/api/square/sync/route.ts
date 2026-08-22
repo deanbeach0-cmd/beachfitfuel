@@ -18,14 +18,30 @@ type UpsertRow = {
   image_urls: string[] | null
 }
 
-export async function POST(request: NextRequest) {
+// Shared by both triggers: POST for manual/curl syncs, GET for Vercel Cron
+// (which calls scheduled routes with GET + an Authorization bearer header).
+// Both check the same SYNC_SECRET — set CRON_SECRET in Vercel to that same value.
+function isAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
   const syncSecret = process.env.SYNC_SECRET
+  return !!syncSecret && authHeader === `Bearer ${syncSecret}`
+}
 
-  if (!syncSecret || authHeader !== `Bearer ${syncSecret}`) {
+export async function GET(request: NextRequest) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  return runSync()
+}
 
+export async function POST(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return runSync()
+}
+
+async function runSync() {
   try {
     // Get Marshall's Supabase location ID
     const { data: location, error: locationError } = await supabaseAdmin

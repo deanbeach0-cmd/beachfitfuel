@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { squareClient } from '@/lib/square'
 import { printful } from '@/lib/printful'
+import { resend, FROM_EMAIL } from '@/lib/resend'
+import { apparelOrderConfirmationEmail } from '@/lib/email-templates'
 import type { CartItem } from '@/types/shop'
 
 interface ShippingAddress {
@@ -103,6 +105,22 @@ export async function POST(request: NextRequest) {
       paymentId,
       error: err instanceof Error ? err.message : err,
     })
+  }
+
+  // Send confirmation email — never let a failed send fail the order, since
+  // payment already succeeded by this point.
+  try {
+    const { subject, html } = apparelOrderConfirmationEmail({
+      customerName: `${shippingAddress.firstName} ${shippingAddress.lastName}`,
+      orderId: printfulOrderId ? String(printfulOrderId) : paymentId,
+      items: items
+        .filter((i) => i.type === 'apparel')
+        .map((i) => ({ name: i.name, quantity: i.quantity, priceCents: i.price })),
+      totalCents: amountCents,
+    })
+    await resend.emails.send({ from: FROM_EMAIL, to: shippingAddress.email, subject, html })
+  } catch (err) {
+    console.error('[orders/apparel] Confirmation email failed', err)
   }
 
   return NextResponse.json({
