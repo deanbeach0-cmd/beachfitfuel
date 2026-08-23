@@ -2,7 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { squareClient, LOCATION_IDS } from '@/lib/square'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { pickupOrderConfirmationEmail } from '@/lib/email-templates'
-import type { PickupCartItem, PickupCustomer } from '@/types/pickup'
+import type { PickupCartItem, PickupCustomer, PickupTime } from '@/types/pickup'
+
+// Square requires an explicit pickup_at timestamp whenever the fulfillment
+// isn't ASAP — "SCHEDULED" alone isn't enough and gets rejected with
+// MISSING_REQUIRED_PARAMETER.
+const PICKUP_MINUTES: Record<Exclude<PickupTime, 'ASAP'>, number> = {
+  '15min': 15,
+  '30min': 30,
+  '45min': 45,
+  '1hr': 60,
+}
+
+function pickupAtFor(pickupTime: PickupTime): string | undefined {
+  if (pickupTime === 'ASAP') return undefined
+  return new Date(Date.now() + PICKUP_MINUTES[pickupTime] * 60_000).toISOString()
+}
 
 interface PickupOrderRequest {
   sourceId?: string
@@ -67,6 +82,7 @@ export async function POST(request: NextRequest) {
                 phoneNumber: customer.phone,
               },
               scheduleType: customer.pickupTime === 'ASAP' ? 'ASAP' : 'SCHEDULED',
+              pickupAt: pickupAtFor(customer.pickupTime),
               note: customer.note || undefined,
             },
           },
