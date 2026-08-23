@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server'
-import { createServerComponentClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { newsletterWelcomeEmail } from '@/lib/email-templates'
+
+// Server-only route — uses the service role client (like /api/square/sync
+// and the admin routes) since email_signups has RLS enabled with no anon
+// INSERT policy. The anon SSR client (createServerComponentClient) would
+// fail here with a row-level security violation.
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -11,9 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
   }
 
-  const supabase = await createServerComponentClient()
-
-  const { error } = await supabase.from('email_signups').insert({
+  const { error } = await supabaseAdmin.from('email_signups').insert({
     email: email.toLowerCase().trim(),
     first_name: firstName ?? null,
     location_preference: locationPreference ?? 'both',
