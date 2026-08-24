@@ -48,12 +48,16 @@ export function pickupOrderConfirmationEmail(params: {
   customerName: string
   orderId: string
   items: PickupOrderEmailItem[]
+  subtotalCents: number
+  taxCents: number
+  shippingCents: number
+  tipCents: number
   totalCents: number
   pickupTime: string
   fulfillment?: 'PICKUP' | 'SHIPMENT'
   shippingAddress?: EmailShippingAddress
 }): EmailTemplate {
-  const { customerName, orderId, items, totalCents, pickupTime } = params
+  const { customerName, orderId, items, subtotalCents, taxCents, shippingCents, tipCents, totalCents, pickupTime } = params
   const isShipment = params.fulfillment === 'SHIPMENT' && params.shippingAddress
 
   const itemRows = items
@@ -96,6 +100,24 @@ export function pickupOrderConfirmationEmail(params: {
     </p>
     <table style="width:100%;border-collapse:collapse;font-size:14px;">
       ${itemRows}
+      <tr>
+        <td style="padding:8px 0 0;color:#2C2C2C99;">Subtotal</td>
+        <td style="padding:8px 0 0;text-align:right;color:#2C2C2C99;">${money(subtotalCents)}</td>
+      </tr>
+      ${shippingCents > 0 ? `
+      <tr>
+        <td style="padding:2px 0 0;color:#2C2C2C99;">Shipping</td>
+        <td style="padding:2px 0 0;text-align:right;color:#2C2C2C99;">${money(shippingCents)}</td>
+      </tr>` : ''}
+      <tr>
+        <td style="padding:2px 0 0;color:#2C2C2C99;">Tax</td>
+        <td style="padding:2px 0 0;text-align:right;color:#2C2C2C99;">${money(taxCents)}</td>
+      </tr>
+      ${tipCents > 0 ? `
+      <tr>
+        <td style="padding:2px 0 0;color:#2C2C2C99;">Tip</td>
+        <td style="padding:2px 0 0;text-align:right;color:#2C2C2C99;">${money(tipCents)}</td>
+      </tr>` : ''}
       <tr>
         <td style="padding:12px 0 0;font-weight:bold;">Total</td>
         <td style="padding:12px 0 0;font-weight:bold;text-align:right;">${money(totalCents)}</td>

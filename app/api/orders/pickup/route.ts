@@ -4,6 +4,7 @@ import { resend, FROM_EMAIL } from '@/lib/resend'
 import { pickupOrderConfirmationEmail } from '@/lib/email-templates'
 import { isWithinBusinessHours } from '@/lib/business-hours'
 import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
+import { SALES_TAX_CATALOG_ID } from '@/lib/tax'
 import type { PickupCartItem, PickupCustomer, PickupTime, FulfillmentType, ShippingAddress } from '@/types/pickup'
 
 // Square requires an explicit pickup_at timestamp whenever the fulfillment
@@ -29,6 +30,7 @@ interface PickupOrderRequest {
   items: PickupCartItem[]
   customer: PickupCustomer
   totalCents: number
+  tipCents?: number
   fulfillment?: FulfillmentType
   shippingAddress?: ShippingAddress
 }
@@ -56,6 +58,7 @@ export async function POST(request: NextRequest) {
   const { sourceId, items, customer, totalCents } = body
   const fulfillment: FulfillmentType = body.fulfillment ?? 'PICKUP'
   const shippingAddress = body.shippingAddress
+  const tipCents = Math.max(0, Math.round(body.tipCents ?? 0))
 
   if (!sourceId || !items?.length || !customer?.name || !customer?.phone || !customer?.email || !totalCents) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -88,9 +91,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Marshall location not configured' }, { status: 500 })
   }
 
-  // Step 1: Create Square Order — shows up in POS as a pickup or shipment order
+  // Step 1: Create Square Order — shows up in POS as a pickup or shipment order.
+  // Tax references the same "Michigan Sales Tax" catalog object used in-store,
+  // applied only to product line items — shipping stays untaxed.
   let orderId: string
+  let orderTotalCents: number
   try {
+    const TAX_UID = 'sales-tax'
     const lineItems = items.map((i) => ({
       name: i.name,
       quantity: String(i.quantity),
@@ -99,22 +106,33 @@ export async function POST(request: NextRequest) {
         amount: BigInt(i.priceCents),
         currency: 'USD' as const,
       },
+      appliedTaxes: [{ taxUid: TAX_UID }],
     }))
 
-    if (fulfillment === 'SHIPMENT') {
-      lineItems.push({
-        name: 'Shipping (USPS)',
-        quantity: '1',
-        note: undefined,
-        basePriceMoney: { amount: BigInt(SHIPPING_FLAT_FEE_CENTS), currency: 'USD' as const },
-      })
-    }
+    const allLineItems = fulfillment === 'SHIPMENT'
+      ? [
+          ...lineItems,
+          {
+            name: 'Shipping (USPS)',
+            quantity: '1',
+            note: undefined,
+            basePriceMoney: { amount: BigInt(SHIPPING_FLAT_FEE_CENTS), currency: 'USD' as const },
+          },
+        ]
+      : lineItems
 
     const orderRes = await squareClient.orders.create({
       idempotencyKey: `pickup-order-${Date.now()}-${randomKey()}`,
       order: {
         locationId,
-        lineItems,
+        lineItems: allLineItems,
+        taxes: [
+          {
+            uid: TAX_UID,
+            catalogObjectId: SALES_TAX_CATALOG_ID,
+            scope: 'LINE_ITEM',
+          },
+        ],
         fulfillments:
           fulfillment === 'SHIPMENT'
             ? [
@@ -153,23 +171,29 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    if (!orderRes.order?.id) {
+    if (!orderRes.order?.id || orderRes.order.totalMoney?.amount == null) {
       return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
     }
     orderId = orderRes.order.id
+    // Square computes the real total (items + tax + shipping) — trust that
+    // over anything the client sent, since only Square knows the exact tax.
+    orderTotalCents = Number(orderRes.order.totalMoney.amount)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Order creation failed'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 
-  // Step 2: Charge card — every order is paid online now, no pay-at-pickup
+  // Step 2: Charge card — every order is paid online now, no pay-at-pickup.
+  // tip_money is added by Square on top of amount_money, so amount_money is
+  // just the order total (it must NOT already include the tip).
   try {
     const payRes = await squareClient.payments.create({
       sourceId,
       amountMoney: {
-        amount: BigInt(totalCents),
+        amount: BigInt(orderTotalCents),
         currency: 'USD',
       },
+      tipMoney: tipCents > 0 ? { amount: BigInt(tipCents), currency: 'USD' } : undefined,
       locationId,
       orderId,
       idempotencyKey: `pickup-pay-${Date.now()}-${randomKey()}`,
@@ -184,6 +208,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 402 })
   }
 
+  const subtotalCents = items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0)
+  const shippingCents = fulfillment === 'SHIPMENT' ? SHIPPING_FLAT_FEE_CENTS : 0
+  const taxCents = orderTotalCents - subtotalCents - shippingCents
+  const grandTotalCents = orderTotalCents + tipCents
+
   // Step 3: Send confirmation email — never let a failed send fail the order,
   // since payment/order creation already succeeded by this point.
   try {
@@ -196,7 +225,11 @@ export async function POST(request: NextRequest) {
         priceCents: i.priceCents,
         flavors: i.flavors,
       })),
-      totalCents,
+      subtotalCents,
+      taxCents,
+      shippingCents,
+      tipCents,
+      totalCents: grandTotalCents,
       fulfillment,
       pickupTime: pickupAt
         ? new Date(pickupAt).toLocaleString('en-US', {
@@ -216,6 +249,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     success: true,
     orderId,
-    totalCents,
+    totalCents: grandTotalCents,
   })
 }

@@ -7,7 +7,11 @@ import { Trash2, ShoppingBag, CreditCard, Store, Truck } from 'lucide-react'
 import { usePickupCartStore } from '@/lib/pickup-cart-store'
 import { getPickupAvailability, PickupAvailability } from '@/lib/business-hours'
 import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
+import { SALES_TAX_RATE } from '@/lib/tax'
 import type { PickupCustomer, PickupTime, FulfillmentType, ShippingAddress } from '@/types/pickup'
+
+const TIP_PRESETS = [15, 20, 25] as const
+type TipOption = (typeof TIP_PRESETS)[number] | 'custom' | 'none'
 
 declare global {
   interface Window {
@@ -49,6 +53,8 @@ export function PickupOrderForm() {
   const [fulfillment, setFulfillment] = useState<FulfillmentType>('PICKUP')
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>(EMPTY_SHIPPING)
   const [availability, setAvailability] = useState<PickupAvailability | null>(null)
+  const [tipOption, setTipOption] = useState<TipOption>('none')
+  const [customTipInput, setCustomTipInput] = useState('')
   const [squareLoaded, setSquareLoaded] = useState(false)
   const [cardReady, setCardReady] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -69,6 +75,14 @@ export function PickupOrderForm() {
   }, [])
 
   const allItemsShippable = items.length > 0 && items.every((i) => i.shippable)
+
+  // Tipping doesn't apply to mailed orders — reset if the customer switches to Ship.
+  useEffect(() => {
+    if (fulfillment === 'SHIPMENT') {
+      setTipOption('none')
+      setCustomTipInput('')
+    }
+  }, [fulfillment])
 
   // Load Square Web Payments SDK
   useEffect(() => {
@@ -126,7 +140,16 @@ export function PickupOrderForm() {
   if (!mounted) return null
 
   const shippingFeeCents = fulfillment === 'SHIPMENT' ? SHIPPING_FLAT_FEE_CENTS : 0
-  const total = subtotalCents() + shippingFeeCents
+  // Estimated — Square computes the exact tax server-side at checkout, which
+  // is what's actually charged; this may differ by a cent from rounding.
+  const estimatedTaxCents = Math.round(subtotalCents() * SALES_TAX_RATE)
+  const tipCents =
+    tipOption === 'none'
+      ? 0
+      : tipOption === 'custom'
+      ? Math.round((parseFloat(customTipInput) || 0) * 100)
+      : Math.round(subtotalCents() * (tipOption / 100))
+  const total = subtotalCents() + estimatedTaxCents + shippingFeeCents + tipCents
   const totalDollars = (total / 100).toFixed(2)
 
   if (items.length === 0) {
@@ -184,6 +207,7 @@ export function PickupOrderForm() {
           items,
           customer,
           totalCents: total,
+          tipCents,
           fulfillment,
           shippingAddress: fulfillment === 'SHIPMENT' ? shippingAddress : undefined,
         }),
@@ -193,7 +217,8 @@ export function PickupOrderForm() {
       if (!res.ok) throw new Error(data.error ?? 'Order failed')
 
       clearCart()
-      router.push(`/order/confirmation?orderId=${data.orderId}&total=${totalDollars}&fulfillment=${fulfillment}`)
+      const chargedTotal = ((data.totalCents ?? total) / 100).toFixed(2)
+      router.push(`/order/confirmation?orderId=${data.orderId}&total=${chargedTotal}&fulfillment=${fulfillment}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -525,6 +550,68 @@ export function PickupOrderForm() {
         {/* Payment */}
         <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-4">
           <h2 className="font-display text-xl tracking-widest text-dark">PAYMENT</h2>
+
+          {fulfillment === 'PICKUP' && (
+            <div>
+              <label className="block font-body text-sm font-bold text-dark mb-2">Add a tip?</label>
+              <div className="flex flex-wrap gap-2">
+                {TIP_PRESETS.map((pct) => (
+                  <button
+                    type="button"
+                    key={pct}
+                    onClick={() => { setTipOption(pct); setCustomTipInput('') }}
+                    className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
+                    style={
+                      tipOption === pct
+                        ? { backgroundColor: '#6FBDB8', color: 'white' }
+                        : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                    }
+                  >
+                    {pct}%
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setTipOption('custom')}
+                  className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
+                  style={
+                    tipOption === 'custom'
+                      ? { backgroundColor: '#6FBDB8', color: 'white' }
+                      : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                  }
+                >
+                  Custom
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTipOption('none'); setCustomTipInput('') }}
+                  className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
+                  style={
+                    tipOption === 'none'
+                      ? { backgroundColor: '#6FBDB8', color: 'white' }
+                      : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                  }
+                >
+                  No tip
+                </button>
+              </div>
+              {tipOption === 'custom' && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="font-body text-dark/50 text-sm">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={customTipInput}
+                    onChange={(e) => setCustomTipInput(e.target.value)}
+                    placeholder="0.00"
+                    className="w-28 px-3 py-2 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             {!squareLoaded ? (
               <div className="flex items-center gap-2 py-4">
@@ -579,10 +666,24 @@ export function PickupOrderForm() {
           </div>
 
           <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
+            <div className="flex justify-between">
+              <span className="font-body text-dark/50 text-sm">Subtotal</span>
+              <span className="font-body text-sm">${(subtotalCents() / 100).toFixed(2)}</span>
+            </div>
             {shippingFeeCents > 0 && (
               <div className="flex justify-between">
                 <span className="font-body text-dark/50 text-sm">Shipping (USPS)</span>
                 <span className="font-body text-sm">${(shippingFeeCents / 100).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="font-body text-dark/50 text-sm">Tax</span>
+              <span className="font-body text-sm">${(estimatedTaxCents / 100).toFixed(2)}</span>
+            </div>
+            {tipCents > 0 && (
+              <div className="flex justify-between">
+                <span className="font-body text-dark/50 text-sm">Tip</span>
+                <span className="font-body text-sm">${(tipCents / 100).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold pt-2">
