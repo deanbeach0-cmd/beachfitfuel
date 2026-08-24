@@ -8,14 +8,14 @@ export const metadata: Metadata = {
 }
 
 interface PageProps {
-  searchParams: Promise<{ orderId?: string; total?: string; paid?: string }>
+  searchParams: Promise<{ orderId?: string; total?: string; fulfillment?: string }>
 }
 
 export default async function OrderConfirmationPage({ searchParams }: PageProps) {
   const params = await searchParams
   const orderId = params.orderId ?? ''
   const total = params.total ?? '0.00'
-  const paidOnline = params.paid === 'true'
+  const isShipment = params.fulfillment === 'SHIPMENT'
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16" style={{ backgroundColor: '#FFF8EE' }}>
@@ -35,7 +35,9 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
             ORDER PLACED!
           </h1>
           <p className="font-body text-dark/60 mt-3 text-base leading-relaxed">
-            We got it — your drinks will be ready for pickup at Marshall.
+            {isShipment
+              ? "We got it — your order will ship via USPS."
+              : 'We got it — your drinks will be ready for pickup at Marshall.'}
           </p>
         </div>
 
@@ -58,36 +60,37 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
 
           <div className="flex justify-between items-center">
             <span className="font-body text-dark/50 text-sm">Payment</span>
-            <span
-              className="font-body font-bold text-sm"
-              style={{ color: paidOnline ? '#FF7B9D' : '#6FBDB8' }}
-            >
-              {paidOnline ? '💳 Paid online' : '🏪 Pay at pickup'}
+            <span className="font-body font-bold text-sm" style={{ color: '#FF7B9D' }}>
+              💳 Paid online
             </span>
           </div>
 
-          <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
-            <div className="flex items-start gap-2">
-              <MapPin size={14} className="text-dark/40 mt-0.5 flex-shrink-0" />
-              <span className="font-body text-dark/60 text-sm">
-                205 W Michigan Ave, Marshall, MI 49068
-              </span>
+          {!isShipment && (
+            <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <MapPin size={14} className="text-dark/40 mt-0.5 flex-shrink-0" />
+                <span className="font-body text-dark/60 text-sm">
+                  205 W Michigan Ave, Marshall, MI 49068
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone size={14} className="text-dark/40 flex-shrink-0" />
+                <a
+                  href="tel:+12692343645"
+                  className="font-body text-dark/60 text-sm hover:text-dark transition-colors"
+                >
+                  (269) 234-3645
+                </a>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Phone size={14} className="text-dark/40 flex-shrink-0" />
-              <a
-                href="tel:+12692343645"
-                className="font-body text-dark/60 text-sm hover:text-dark transition-colors"
-              >
-                (269) 234-3645
-              </a>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Note */}
         <p className="font-body text-dark/50 text-sm leading-relaxed">
-          We&apos;ll call if we have any questions about your order. See you soon!
+          {isShipment
+            ? "We'll email you tracking info once your order ships. Thanks for your order!"
+            : "We'll call if we have any questions about your order. See you soon!"}
         </p>
 
         {/* CTAs */}

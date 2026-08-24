@@ -7,6 +7,7 @@ import { usePickupCartStore } from '@/lib/pickup-cart-store'
 import { FlavorOption, MenuItem, TAG_LABELS } from '@/types/menu'
 import { FlavorSelection } from '@/types/pickup'
 import { getCategoryStyle } from '@/lib/category-style'
+import { TO_GO_PACK_CATEGORY_ID } from '@/lib/shipping'
 import { FlavorPicker } from './FlavorPicker'
 
 interface Props {
@@ -44,6 +45,7 @@ export function MenuItemDetail({ item, flavorOptions }: Props) {
       emoji: style.emoji,
       category: item.category_name ?? 'Menu',
       flavors: needsFlavors ? flavorSelections : undefined,
+      shippable: item.square_category_id === TO_GO_PACK_CATEGORY_ID,
     })
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)

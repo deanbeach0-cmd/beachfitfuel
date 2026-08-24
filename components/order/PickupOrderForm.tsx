@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Trash2, ShoppingBag, CreditCard, Store } from 'lucide-react'
+import { Trash2, ShoppingBag, CreditCard, Store, Truck } from 'lucide-react'
 import { usePickupCartStore } from '@/lib/pickup-cart-store'
-import type { PickupCustomer, PickupTime } from '@/types/pickup'
+import { getPickupAvailability, PickupAvailability } from '@/lib/business-hours'
+import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
+import type { PickupCustomer, PickupTime, FulfillmentType, ShippingAddress } from '@/types/pickup'
 
 declare global {
   interface Window {
@@ -13,13 +15,12 @@ declare global {
   }
 }
 
-const PICKUP_TIMES: { value: PickupTime; label: string }[] = [
-  { value: 'ASAP',  label: 'ASAP' },
-  { value: '15min', label: '15 min' },
-  { value: '30min', label: '30 min' },
-  { value: '45min', label: '45 min' },
-  { value: '1hr',   label: '1 hr' },
-]
+const OFFSET_LABELS: Record<Exclude<PickupTime, 'ASAP'>, string> = {
+  '15min': '15 min',
+  '30min': '30 min',
+  '45min': '45 min',
+  '1hr': '1 hr',
+}
 
 const EMPTY_CUSTOMER: PickupCustomer = {
   name: '',
@@ -29,13 +30,25 @@ const EMPTY_CUSTOMER: PickupCustomer = {
   note: '',
 }
 
+const EMPTY_SHIPPING: ShippingAddress = {
+  firstName: '',
+  lastName: '',
+  address1: '',
+  address2: '',
+  city: '',
+  state: '',
+  zip: '',
+}
+
 export function PickupOrderForm() {
   const { items, removeItem, updateQuantity, clearCart, subtotalCents } = usePickupCartStore()
   const router = useRouter()
 
   const [mounted, setMounted] = useState(false)
   const [customer, setCustomer] = useState<PickupCustomer>(EMPTY_CUSTOMER)
-  const [payNow, setPayNow] = useState(true)
+  const [fulfillment, setFulfillment] = useState<FulfillmentType>('PICKUP')
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>(EMPTY_SHIPPING)
+  const [availability, setAvailability] = useState<PickupAvailability | null>(null)
   const [squareLoaded, setSquareLoaded] = useState(false)
   const [cardReady, setCardReady] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -44,11 +57,21 @@ export function PickupOrderForm() {
   const cardRef = useRef<any>(null)
   const cardContainerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+    const avail = getPickupAvailability()
+    setAvailability(avail)
+    // Store closed right now — pre-select the first available slot so the
+    // form always starts in a submittable state.
+    if (!avail.openNow && avail.nextDay?.slots.length) {
+      setCustomer((c) => ({ ...c, scheduledPickupAt: avail.nextDay!.slots[0].iso }))
+    }
+  }, [])
+
+  const allItemsShippable = items.length > 0 && items.every((i) => i.shippable)
 
   // Load Square Web Payments SDK
   useEffect(() => {
-    if (!payNow) return
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID
     if (!appId) return
 
@@ -66,11 +89,11 @@ export function PickupOrderForm() {
     script.onload = () => setSquareLoaded(true)
     script.onerror = () => setError('Failed to load payment form. Please refresh and try again.')
     document.head.appendChild(script)
-  }, [payNow])
+  }, [])
 
   // Initialize Square card form
   useEffect(() => {
-    if (!payNow || !squareLoaded || !cardContainerRef.current) return
+    if (!squareLoaded || !cardContainerRef.current) return
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID
     const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID
     if (!appId || !locationId || !window.Square) return
@@ -98,11 +121,12 @@ export function PickupOrderForm() {
     })
 
     return () => { isMounted = false }
-  }, [squareLoaded, payNow])
+  }, [squareLoaded])
 
   if (!mounted) return null
 
-  const total = subtotalCents()
+  const shippingFeeCents = fulfillment === 'SHIPMENT' ? SHIPPING_FLAT_FEE_CENTS : 0
+  const total = subtotalCents() + shippingFeeCents
   const totalDollars = (total / 100).toFixed(2)
 
   if (items.length === 0) {
@@ -128,7 +152,17 @@ export function PickupOrderForm() {
       setError('Please enter your name, phone number, and email.')
       return
     }
-    if (payNow && (!cardRef.current || !cardReady)) {
+    if (fulfillment === 'SHIPMENT') {
+      const { firstName, lastName, address1, city, state, zip } = shippingAddress
+      if (!firstName || !lastName || !address1 || !city || !state || !zip) {
+        setError('Please fill in your full shipping address.')
+        return
+      }
+    } else if (!availability?.openNow && !customer.scheduledPickupAt) {
+      setError('Please choose a pickup time.')
+      return
+    }
+    if (!cardRef.current || !cardReady) {
       setError('Card payment form is not ready yet.')
       return
     }
@@ -136,15 +170,11 @@ export function PickupOrderForm() {
     setLoading(true)
 
     try {
-      let sourceId: string | undefined
-
-      if (payNow) {
-        const result = await cardRef.current.tokenize()
-        if (result.status !== 'OK') {
-          throw new Error(result.errors?.[0]?.message ?? 'Card tokenization failed')
-        }
-        sourceId = result.token
+      const result = await cardRef.current.tokenize()
+      if (result.status !== 'OK') {
+        throw new Error(result.errors?.[0]?.message ?? 'Card tokenization failed')
       }
+      const sourceId = result.token
 
       const res = await fetch('/api/orders/pickup', {
         method: 'POST',
@@ -154,6 +184,8 @@ export function PickupOrderForm() {
           items,
           customer,
           totalCents: total,
+          fulfillment,
+          shippingAddress: fulfillment === 'SHIPMENT' ? shippingAddress : undefined,
         }),
       })
 
@@ -161,7 +193,7 @@ export function PickupOrderForm() {
       if (!res.ok) throw new Error(data.error ?? 'Order failed')
 
       clearCart()
-      router.push(`/order/confirmation?orderId=${data.orderId}&total=${totalDollars}&paid=${data.paidOnline}`)
+      router.push(`/order/confirmation?orderId=${data.orderId}&total=${totalDollars}&fulfillment=${fulfillment}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -171,11 +203,11 @@ export function PickupOrderForm() {
 
   const submitLabel = loading
     ? 'PLACING ORDER…'
-    : payNow
-    ? (!cardReady ? 'LOADING PAYMENT…' : `PLACE ORDER — $${totalDollars}`)
-    : `PLACE ORDER · PAY AT PICKUP`
+    : !cardReady
+    ? 'LOADING PAYMENT…'
+    : `PLACE ORDER — $${totalDollars}`
 
-  const submitDisabled = loading || (payNow && !cardReady)
+  const submitDisabled = loading || !cardReady
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -254,9 +286,50 @@ export function PickupOrderForm() {
           </div>
         </div>
 
-        {/* Pickup details */}
+        {/* Pickup vs Ship — only offered when every item in the cart is a
+            shippable To-Go Pack (drinks/food can't be shipped) */}
+        {allItemsShippable && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-4">
+            <h2 className="font-display text-xl tracking-widest text-dark">HOW WOULD YOU LIKE THIS?</h2>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setFulfillment('PICKUP')}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-bold text-sm transition-all"
+                style={
+                  fulfillment === 'PICKUP'
+                    ? { backgroundColor: '#FF7B9D', color: 'white' }
+                    : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                }
+              >
+                <Store className="w-4 h-4" />
+                PICKUP
+              </button>
+              <button
+                type="button"
+                onClick={() => setFulfillment('SHIPMENT')}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-bold text-sm transition-all"
+                style={
+                  fulfillment === 'SHIPMENT'
+                    ? { backgroundColor: '#9BBDCF', color: 'white' }
+                    : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                }
+              >
+                <Truck className="w-4 h-4" />
+                SHIP — ${(SHIPPING_FLAT_FEE_CENTS / 100).toFixed(2)}
+              </button>
+            </div>
+            {fulfillment === 'SHIPMENT' && (
+              <p className="font-body text-dark/50 text-xs">Ships via USPS. Please allow a few business days.</p>
+            )}
+          </div>
+        )}
+
+        {/* Contact + fulfillment details */}
         <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-4">
-          <h2 className="font-display text-xl tracking-widest text-dark">PICKUP DETAILS</h2>
+          <h2 className="font-display text-xl tracking-widest text-dark">
+            {fulfillment === 'SHIPMENT' ? 'SHIPPING DETAILS' : 'PICKUP DETAILS'}
+          </h2>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 sm:col-span-1">
@@ -294,29 +367,145 @@ export function PickupOrderForm() {
             </div>
           </div>
 
-          {/* Pickup time */}
-          <div>
-            <label className="block font-body text-sm font-bold text-dark mb-2">
-              When do you want to pick up?
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {PICKUP_TIMES.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setCustomer((c) => ({ ...c, pickupTime: value }))}
-                  className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
-                  style={
-                    customer.pickupTime === value
-                      ? { backgroundColor: '#FF7B9D', color: 'white' }
-                      : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
-                  }
-                >
-                  {label}
-                </button>
-              ))}
+          {fulfillment === 'SHIPMENT' ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block font-body text-sm font-bold text-dark mb-1">First Name *</label>
+                <input
+                  type="text"
+                  value={shippingAddress.firstName}
+                  onChange={(e) => setShippingAddress((a) => ({ ...a, firstName: e.target.value }))}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block font-body text-sm font-bold text-dark mb-1">Last Name *</label>
+                <input
+                  type="text"
+                  value={shippingAddress.lastName}
+                  onChange={(e) => setShippingAddress((a) => ({ ...a, lastName: e.target.value }))}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block font-body text-sm font-bold text-dark mb-1">Address *</label>
+                <input
+                  type="text"
+                  value={shippingAddress.address1}
+                  onChange={(e) => setShippingAddress((a) => ({ ...a, address1: e.target.value }))}
+                  placeholder="Street address"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
+              <div className="col-span-2">
+                <input
+                  type="text"
+                  value={shippingAddress.address2}
+                  onChange={(e) => setShippingAddress((a) => ({ ...a, address2: e.target.value }))}
+                  placeholder="Apt, suite, etc. (optional)"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block font-body text-sm font-bold text-dark mb-1">City *</label>
+                <input
+                  type="text"
+                  value={shippingAddress.city}
+                  onChange={(e) => setShippingAddress((a) => ({ ...a, city: e.target.value }))}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block font-body text-sm font-bold text-dark mb-1">State *</label>
+                <input
+                  type="text"
+                  value={shippingAddress.state}
+                  onChange={(e) => setShippingAddress((a) => ({ ...a, state: e.target.value.toUpperCase() }))}
+                  placeholder="MI"
+                  maxLength={2}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block font-body text-sm font-bold text-dark mb-1">ZIP *</label>
+                <input
+                  type="text"
+                  value={shippingAddress.zip}
+                  onChange={(e) => setShippingAddress((a) => ({ ...a, zip: e.target.value }))}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block font-body text-sm font-bold text-dark mb-2">
+                When do you want to pick up?
+              </label>
+              {availability?.openNow ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCustomer((c) => ({ ...c, pickupTime: 'ASAP', scheduledPickupAt: undefined }))}
+                    className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
+                    style={
+                      customer.pickupTime === 'ASAP' && !customer.scheduledPickupAt
+                        ? { backgroundColor: '#FF7B9D', color: 'white' }
+                        : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                    }
+                  >
+                    ASAP
+                  </button>
+                  {availability.validOffsetMinutes.map((minutes) => {
+                    const value = (minutes === 15 ? '15min' : minutes === 30 ? '30min' : minutes === 45 ? '45min' : '1hr') as Exclude<PickupTime, 'ASAP'>
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setCustomer((c) => ({ ...c, pickupTime: value, scheduledPickupAt: undefined }))}
+                        className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
+                        style={
+                          customer.pickupTime === value && !customer.scheduledPickupAt
+                            ? { backgroundColor: '#FF7B9D', color: 'white' }
+                            : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                        }
+                      >
+                        {OFFSET_LABELS[value]}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="font-body text-dark/50 text-sm">
+                    We&apos;re closed right now — pick a time for {availability?.nextDay?.label ?? 'our next open day'}:
+                  </p>
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                    {availability?.nextDay?.slots.map((slot) => (
+                      <button
+                        key={slot.iso}
+                        type="button"
+                        onClick={() => setCustomer((c) => ({ ...c, scheduledPickupAt: slot.iso }))}
+                        className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
+                        style={
+                          customer.scheduledPickupAt === slot.iso
+                            ? { backgroundColor: '#FF7B9D', color: 'white' }
+                            : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
+                        }
+                      >
+                        {slot.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div>
@@ -333,58 +522,22 @@ export function PickupOrderForm() {
           </div>
         </div>
 
-        {/* Payment method toggle */}
+        {/* Payment */}
         <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-4">
           <h2 className="font-display text-xl tracking-widest text-dark">PAYMENT</h2>
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setPayNow(true)}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-bold text-sm transition-all"
-              style={
-                payNow
-                  ? { backgroundColor: '#FF7B9D', color: 'white' }
-                  : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
-              }
-            >
-              <CreditCard className="w-4 h-4" />
-              PAY NOW
-            </button>
-            <button
-              type="button"
-              onClick={() => { setPayNow(false); setError(null) }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-bold text-sm transition-all"
-              style={
-                !payNow
-                  ? { backgroundColor: '#6FBDB8', color: 'white' }
-                  : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
-              }
-            >
-              <Store className="w-4 h-4" />
-              PAY AT PICKUP
-            </button>
+          <div>
+            {!squareLoaded ? (
+              <div className="flex items-center gap-2 py-4">
+                <div className="w-4 h-4 rounded-full border-2 border-pink-300 border-t-transparent animate-spin" />
+                <p className="font-body text-dark/50 text-sm">Loading payment form…</p>
+              </div>
+            ) : (
+              <div id="pickup-card-container" ref={cardContainerRef} className="min-h-[90px]" />
+            )}
+            <p className="font-body text-dark/40 text-xs mt-3 flex items-center gap-1">
+              🔒 Secured by Square. We never store your card details.
+            </p>
           </div>
-
-          {payNow ? (
-            <div>
-              {!squareLoaded ? (
-                <div className="flex items-center gap-2 py-4">
-                  <div className="w-4 h-4 rounded-full border-2 border-pink-300 border-t-transparent animate-spin" />
-                  <p className="font-body text-dark/50 text-sm">Loading payment form…</p>
-                </div>
-              ) : (
-                <div id="pickup-card-container" ref={cardContainerRef} className="min-h-[90px]" />
-              )}
-              <p className="font-body text-dark/40 text-xs mt-3 flex items-center gap-1">
-                🔒 Secured by Square. We never store your card details.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl px-4 py-3 font-body text-sm text-dark/60" style={{ backgroundColor: '#6FBDB822' }}>
-              You&apos;ll pay in store when you arrive to pick up your order.
-            </div>
-          )}
         </div>
 
         {error && (
@@ -426,25 +579,33 @@ export function PickupOrderForm() {
           </div>
 
           <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
+            {shippingFeeCents > 0 && (
+              <div className="flex justify-between">
+                <span className="font-body text-dark/50 text-sm">Shipping (USPS)</span>
+                <span className="font-body text-sm">${(shippingFeeCents / 100).toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold pt-2">
               <span className="font-body">Total</span>
               <span className="font-body">${totalDollars}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-body text-dark/50 text-sm">Pickup at</span>
-              <span className="font-body text-sm text-right">205 W Michigan Ave</span>
+              <span className="font-body text-dark/50 text-sm">
+                {fulfillment === 'SHIPMENT' ? 'Ships to' : 'Pickup at'}
+              </span>
+              <span className="font-body text-sm text-right">
+                {fulfillment === 'SHIPMENT'
+                  ? (shippingAddress.city ? `${shippingAddress.city}, ${shippingAddress.state}` : 'Your address')
+                  : '205 W Michigan Ave'}
+              </span>
             </div>
           </div>
 
           <div
             className="mt-4 flex items-center justify-center gap-2 rounded-xl py-2 px-3 font-body text-sm font-bold"
-            style={
-              payNow
-                ? { backgroundColor: '#FF7B9D22', color: '#FF7B9D' }
-                : { backgroundColor: '#6FBDB822', color: '#6FBDB8' }
-            }
+            style={{ backgroundColor: '#FF7B9D22', color: '#FF7B9D' }}
           >
-            {payNow ? <><CreditCard className="w-4 h-4" /> Pay Now</> : <><Store className="w-4 h-4" /> Pay at Pickup</>}
+            <CreditCard className="w-4 h-4" /> Pay Now
           </div>
         </div>
       </div>

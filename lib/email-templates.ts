@@ -34,15 +34,27 @@ interface PickupOrderEmailItem {
   flavors?: { name: string; quantity: number }[]
 }
 
+interface EmailShippingAddress {
+  firstName: string
+  lastName: string
+  address1: string
+  address2?: string
+  city: string
+  state: string
+  zip: string
+}
+
 export function pickupOrderConfirmationEmail(params: {
   customerName: string
   orderId: string
   items: PickupOrderEmailItem[]
   totalCents: number
   pickupTime: string
-  paidOnline: boolean
+  fulfillment?: 'PICKUP' | 'SHIPMENT'
+  shippingAddress?: EmailShippingAddress
 }): EmailTemplate {
-  const { customerName, orderId, items, totalCents, pickupTime, paidOnline } = params
+  const { customerName, orderId, items, totalCents, pickupTime } = params
+  const isShipment = params.fulfillment === 'SHIPMENT' && params.shippingAddress
 
   const itemRows = items
     .map((item) => {
@@ -65,11 +77,22 @@ export function pickupOrderConfirmationEmail(params: {
     })
     .join('')
 
+  const fulfillmentBlock = isShipment
+    ? `
+      <div><strong>Shipping to:</strong> ${params.shippingAddress!.firstName} ${params.shippingAddress!.lastName}, ${params.shippingAddress!.address1}${params.shippingAddress!.address2 ? ', ' + params.shippingAddress!.address2 : ''}, ${params.shippingAddress!.city}, ${params.shippingAddress!.state} ${params.shippingAddress!.zip}</div>
+      <div><strong>Order #:</strong> ${orderId}</div>
+    `
+    : `
+      <div><strong>Pickup time:</strong> ${pickupTime === 'ASAP' ? 'ASAP' : pickupTime}</div>
+      <div><strong>Order #:</strong> ${orderId}</div>
+    `
+
   const body = `
     <h1 style="font-size:22px;margin:0 0 8px;">Thanks, ${customerName}! 🌴</h1>
     <p style="font-size:14px;line-height:1.5;color:#2C2C2C99;margin:0 0 20px;">
-      Your pickup order is confirmed for our Marshall location.
-      ${paidOnline ? "You're all paid up — just come grab it." : "You'll pay when you arrive."}
+      ${isShipment
+        ? "Your order is confirmed and will ship via USPS. You're all paid up."
+        : "Your pickup order is confirmed for our Marshall location. You're all paid up — just come grab it."}
     </p>
     <table style="width:100%;border-collapse:collapse;font-size:14px;">
       ${itemRows}
@@ -79,8 +102,7 @@ export function pickupOrderConfirmationEmail(params: {
       </tr>
     </table>
     <div style="margin-top:20px;padding:14px 16px;background-color:#FFF8EE;border-radius:12px;font-size:13px;">
-      <div><strong>Pickup time:</strong> ${pickupTime === 'ASAP' ? 'ASAP' : pickupTime}</div>
-      <div><strong>Order #:</strong> ${orderId}</div>
+      ${fulfillmentBlock}
     </div>
   `
 
