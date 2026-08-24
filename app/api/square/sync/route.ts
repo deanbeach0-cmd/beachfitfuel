@@ -61,7 +61,7 @@ async function runSync() {
     // — Page is AsyncIterable, handles pagination automatically
     const allObjects: Record<string, unknown>[] = []
 
-    const page = await squareClient.catalog.list({ types: 'ITEM,CATEGORY,MODIFIER_LIST,MODIFIER' })
+    const page = await squareClient.catalog.list({ types: 'ITEM,CATEGORY,MODIFIER_LIST,MODIFIER,IMAGE' })
     for await (const obj of page) {
       allObjects.push(obj as unknown as Record<string, unknown>)
     }
@@ -72,6 +72,16 @@ async function runSync() {
     const squareItems = allObjects.filter(
       (o) => o.type === 'ITEM' && !o.isDeleted && !(o.itemData as Record<string, unknown> | undefined)?.isArchived
     )
+
+    // imageIds → URL, so photos show up as soon as they're attached to an item
+    // in Square's item editor — ecomImageUris only populates once a photo is
+    // separately flagged "visible in Online Store", which isn't the default.
+    const imageUrlById = new Map<string, string>()
+    for (const obj of allObjects) {
+      if (obj.type !== 'IMAGE' || obj.isDeleted) continue
+      const url = (obj.imageData as Record<string, unknown> | undefined)?.url as string | undefined
+      if (typeof obj.id === 'string' && url) imageUrlById.set(obj.id, url)
+    }
 
     // --- Sync categories first. square_categories IS the site's category
     // taxonomy — is_visible/emoji/color are owned by /admin/categories and
@@ -191,12 +201,14 @@ async function runSync() {
         )
         const price = priceMoney?.amount ? Number(priceMoney.amount) / 100 : 0
 
-        // Prefer ecomImageUris (already-hosted URLs) over Square catalog image IDs.
         // Some items have several photos in Square — keep the full set for the
         // detail-page gallery, not just the first one.
-        const ecomImageUris = itemData?.ecomImageUris as string[] | undefined
-        const imageUrl = ecomImageUris?.[0] ?? null
-        const imageUrls = ecomImageUris && ecomImageUris.length > 0 ? ecomImageUris : null
+        const itemImageIds = (itemData?.imageIds as string[] | undefined) ?? []
+        const resolvedImages = itemImageIds
+          .map((id) => imageUrlById.get(id))
+          .filter((url): url is string => !!url)
+        const imageUrl = resolvedImages[0] ?? null
+        const imageUrls = resolvedImages.length > 0 ? resolvedImages : null
 
         // reportingCategory is Square's concept of an item's primary category;
         // fall back to the first entry in `categories` if it's unset.
