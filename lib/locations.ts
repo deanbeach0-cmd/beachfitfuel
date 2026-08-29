@@ -1,6 +1,11 @@
-// Central per-location config — address, hours, and the public (client-safe)
-// Square location ID used to init the Web Payments SDK. Safe to import from
+// Central per-location config — address and hours. Safe to import from
 // client components: no 'square' SDK import here, unlike lib/square.ts.
+//
+// Note: the Web Payments SDK's client-side location ID (NEXT_PUBLIC_SQUARE_LOCATION_ID)
+// is intentionally shared across both locations, not per-location — it only
+// affects which payment methods are offered, and doesn't lock the resulting
+// card token to that location. The server decides which location an order
+// actually settles against via SQUARE_LOCATION_ID_BATTLE_CREEK/MARSHALL.
 
 export type LocationSlug = 'marshall' | 'battle-creek'
 
@@ -22,7 +27,6 @@ export interface LocationConfig {
   timezone: string
   /** 0 = Sunday ... 6 = Saturday, matching Date#getDay() */
   hours: Record<number, DayHours | null>
-  publicSquareLocationId: string
 }
 
 export const LOCATIONS: Record<LocationSlug, LocationConfig> = {
@@ -45,7 +49,6 @@ export const LOCATIONS: Record<LocationSlug, LocationConfig> = {
       5: { openMinutes: 360, closeMinutes: 990, label: 'Friday' },
       6: { openMinutes: 540, closeMinutes: 930, label: 'Saturday' }, // 9:00 AM – 3:30 PM
     },
-    publicSquareLocationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID_MARSHALL ?? '',
   },
   'battle-creek': {
     slug: 'battle-creek',
@@ -66,7 +69,6 @@ export const LOCATIONS: Record<LocationSlug, LocationConfig> = {
       5: { openMinutes: 360, closeMinutes: 990, label: 'Friday' },
       6: { openMinutes: 540, closeMinutes: 840, label: 'Saturday' }, // 9:00 AM – 2:00 PM
     },
-    publicSquareLocationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID_BATTLE_CREEK ?? '',
   },
 }
 

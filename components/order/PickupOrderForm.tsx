@@ -125,7 +125,8 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
   useEffect(() => {
     if (!squareLoaded || !cardContainerRef.current) return
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID
-    const locationId = location.publicSquareLocationId
+    // Shared across both locations on purpose — see the note in lib/locations.ts.
+    const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID
     if (!appId || !locationId || !window.Square) return
 
     let isMounted = true
@@ -151,7 +152,7 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
     })
 
     return () => { isMounted = false }
-  }, [squareLoaded, location.publicSquareLocationId])
+  }, [squareLoaded])
 
   if (!mounted) return null
 
