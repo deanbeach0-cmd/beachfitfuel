@@ -8,14 +8,17 @@ import { FlavorOption, MenuItem, TAG_LABELS } from '@/types/menu'
 import { FlavorSelection } from '@/types/pickup'
 import { getCategoryStyle } from '@/lib/category-style'
 import { TO_GO_PACK_CATEGORY_ID } from '@/lib/shipping'
+import { LocationSlug } from '@/lib/locations'
 import { FlavorPicker } from './FlavorPicker'
+import { LocationSwitchNotice } from './LocationSwitchNotice'
 
 interface Props {
   item: MenuItem
+  locationSlug: LocationSlug
   flavorOptions?: FlavorOption[]
 }
 
-export function MenuItemDetail({ item, flavorOptions }: Props) {
+export function MenuItemDetail({ item, locationSlug, flavorOptions }: Props) {
   const addItem = usePickupCartStore((s) => s.addItem)
   const style = getCategoryStyle(item.square_category_id ?? item.id, item.category_emoji, item.category_color)
   const price = `$${Number(item.price).toFixed(2)}`
@@ -46,6 +49,7 @@ export function MenuItemDetail({ item, flavorOptions }: Props) {
       category: item.category_name ?? 'Menu',
       flavors: needsFlavors ? flavorSelections : undefined,
       shippable: item.square_category_id === TO_GO_PACK_CATEGORY_ID,
+      locationSlug,
     })
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
@@ -92,6 +96,7 @@ export function MenuItemDetail({ item, flavorOptions }: Props) {
 
       {/* Info */}
       <div className="flex flex-col gap-6">
+        <LocationSwitchNotice />
         <div>
           {item.category_name && (
             <span

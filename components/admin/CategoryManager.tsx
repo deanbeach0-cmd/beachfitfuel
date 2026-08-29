@@ -11,9 +11,10 @@ interface CategoryManagerProps {
   initialCategories: SquareCategory[]
   allItems: AdminMenuItem[]
   flavorSourcesByItem: Record<string, AdminFlavorSource[]>
+  locationNameById: Record<string, string>
 }
 
-export function CategoryManager({ initialCategories, allItems, flavorSourcesByItem }: CategoryManagerProps) {
+export function CategoryManager({ initialCategories, allItems, flavorSourcesByItem, locationNameById }: CategoryManagerProps) {
   const [categories, setCategories] = useState(initialCategories)
   const [items, setItems] = useState(allItems)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -189,6 +190,9 @@ export function CategoryManager({ initialCategories, allItems, flavorSourcesByIt
                           </td>
                           <td className="py-2 pr-3 text-dark">
                             {item.name}
+                            <span className="ml-2 inline-block font-body text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-dark/5 text-dark/50">
+                              {locationNameById[item.location_id] ?? 'Unknown location'}
+                            </span>
                             {sources.length > 0 && (
                               <div className="flex items-center gap-2 mt-1.5">
                                 <select

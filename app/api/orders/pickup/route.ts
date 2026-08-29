@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { squareClient, LOCATION_IDS } from '@/lib/square'
+import { squareClient, squareLocationIdForSlug } from '@/lib/square'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { pickupOrderConfirmationEmail } from '@/lib/email-templates'
 import { isWithinBusinessHours } from '@/lib/business-hours'
 import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
 import { SALES_TAX_CATALOG_ID } from '@/lib/tax'
+import { getLocation } from '@/lib/locations'
 import type { PickupCartItem, PickupCustomer, PickupTime, FulfillmentType, ShippingAddress } from '@/types/pickup'
 
 // Square requires an explicit pickup_at timestamp whenever the fulfillment
@@ -27,6 +28,7 @@ function resolvePickupAt(customer: PickupCustomer): string | undefined {
 
 interface PickupOrderRequest {
   sourceId: string
+  locationSlug: string
   items: PickupCartItem[]
   customer: PickupCustomer
   totalCents: number
@@ -64,6 +66,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
+  const location = getLocation(body.locationSlug)
+  if (!location) {
+    return NextResponse.json({ error: 'Unknown pickup location' }, { status: 400 })
+  }
+
   if (fulfillment === 'SHIPMENT') {
     if (
       !shippingAddress?.firstName ||
@@ -79,16 +86,16 @@ export async function POST(request: NextRequest) {
 
   const pickupAt = resolvePickupAt(customer)
 
-  if (fulfillment === 'PICKUP' && !isWithinBusinessHours(pickupAt ?? new Date().toISOString())) {
+  if (fulfillment === 'PICKUP' && !isWithinBusinessHours(location.slug, pickupAt ?? new Date().toISOString())) {
     return NextResponse.json(
       { error: 'That pickup time is outside our business hours. Please choose another time.' },
       { status: 400 }
     )
   }
 
-  const locationId = LOCATION_IDS.marshall
+  const locationId = squareLocationIdForSlug(location.slug)
   if (!locationId) {
-    return NextResponse.json({ error: 'Marshall location not configured' }, { status: 500 })
+    return NextResponse.json({ error: `${location.name} location not configured` }, { status: 500 })
   }
 
   // Step 1: Create Square Order — shows up in POS as a pickup or shipment order.
@@ -231,9 +238,10 @@ export async function POST(request: NextRequest) {
       tipCents,
       totalCents: grandTotalCents,
       fulfillment,
+      locationName: location.name,
       pickupTime: pickupAt
         ? new Date(pickupAt).toLocaleString('en-US', {
-            timeZone: 'America/Detroit',
+            timeZone: location.timezone,
             weekday: 'short',
             hour: 'numeric',
             minute: '2-digit',

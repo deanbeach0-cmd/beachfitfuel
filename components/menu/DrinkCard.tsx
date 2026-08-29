@@ -2,19 +2,21 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { MenuItem, TAG_LABELS } from '@/types/menu'
 import { getCategoryStyle } from '@/lib/category-style'
+import { LocationSlug } from '@/lib/locations'
 
 interface DrinkCardProps {
   item: MenuItem
+  locationSlug: LocationSlug
   onAddToOrder?: (item: MenuItem) => void
 }
 
-export function DrinkCard({ item, onAddToOrder }: DrinkCardProps) {
+export function DrinkCard({ item, locationSlug, onAddToOrder }: DrinkCardProps) {
   const style = getCategoryStyle(item.square_category_id ?? item.id, item.category_emoji, item.category_color)
   const price = `$${Number(item.price).toFixed(2)}`
 
   return (
     <Link
-      href={`/menu/marshall/${item.id}`}
+      href={`/menu/${locationSlug}/${item.id}`}
       className="bg-white rounded-2xl overflow-hidden shadow-sm border border-sky/20 flex flex-col hover:shadow-md transition-shadow"
     >
 

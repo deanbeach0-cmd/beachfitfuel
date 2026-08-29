@@ -1,24 +1,4 @@
-// Marshall's pickup hours — kept here as the single source of truth for
-// order-time validation. app/locations/page.tsx has its own display copy of
-// the same hours; if you change hours, update both.
-export const MARSHALL_TIMEZONE = 'America/Detroit'
-
-interface DayHours {
-  openMinutes: number  // minutes since midnight, e.g. 6:00 AM = 360
-  closeMinutes: number
-  label: string
-}
-
-// 0 = Sunday ... 6 = Saturday, matching Date#getDay()
-const HOURS: Record<number, DayHours | null> = {
-  0: null,
-  1: { openMinutes: 360, closeMinutes: 990, label: 'Monday' },    // 6:00 AM – 4:30 PM
-  2: { openMinutes: 360, closeMinutes: 990, label: 'Tuesday' },
-  3: { openMinutes: 360, closeMinutes: 990, label: 'Wednesday' },
-  4: { openMinutes: 360, closeMinutes: 990, label: 'Thursday' },
-  5: { openMinutes: 360, closeMinutes: 990, label: 'Friday' },
-  6: { openMinutes: 540, closeMinutes: 930, label: 'Saturday' },  // 9:00 AM – 3:30 PM
-}
+import { getLocation, LocationSlug } from './locations'
 
 interface ZonedNow {
   dayOfWeek: number
@@ -27,9 +7,9 @@ interface ZonedNow {
   startOfDay: Date
 }
 
-function zonedNow(reference: Date): ZonedNow {
+function zonedNow(reference: Date, timezone: string): ZonedNow {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: MARSHALL_TIMEZONE,
+    timeZone: timezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -40,9 +20,6 @@ function zonedNow(reference: Date): ZonedNow {
   }).formatToParts(reference)
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '0'
-  const year = Number(get('year'))
-  const month = Number(get('month'))
-  const day = Number(get('day'))
   let hour = Number(get('hour'))
   if (hour === 24) hour = 0
   const minute = Number(get('minute'))
@@ -82,8 +59,12 @@ export interface PickupAvailability {
 const OFFSET_OPTIONS = [15, 30, 45, 60]
 const SLOT_INTERVAL_MINUTES = 30
 
-export function getPickupAvailability(reference: Date = new Date()): PickupAvailability {
-  const now = zonedNow(reference)
+export function getPickupAvailability(locationSlug: LocationSlug, reference: Date = new Date()): PickupAvailability {
+  const location = getLocation(locationSlug)
+  if (!location) return { openNow: false, validOffsetMinutes: [] }
+
+  const { hours: HOURS, timezone } = location
+  const now = zonedNow(reference, timezone)
   const today = HOURS[now.dayOfWeek]
 
   if (today && now.minutesSinceMidnight >= today.openMinutes && now.minutesSinceMidnight < today.closeMinutes) {
@@ -107,7 +88,7 @@ export function getPickupAvailability(reference: Date = new Date()): PickupAvail
     for (let m = hours.openMinutes; m < hours.closeMinutes; m += SLOT_INTERVAL_MINUTES) {
       const slotDate = new Date(dayStart.getTime() + m * 60_000)
       const label = slotDate.toLocaleTimeString('en-US', {
-        timeZone: MARSHALL_TIMEZONE,
+        timeZone: timezone,
         hour: 'numeric',
         minute: '2-digit',
       })
@@ -126,11 +107,14 @@ export function getPickupAvailability(reference: Date = new Date()): PickupAvail
 }
 
 /** Server-side guard: is this ISO timestamp actually within business hours? */
-export function isWithinBusinessHours(iso: string): boolean {
+export function isWithinBusinessHours(locationSlug: LocationSlug, iso: string): boolean {
+  const location = getLocation(locationSlug)
+  if (!location) return false
+
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return false
-  const zoned = zonedNow(date)
-  const hours = HOURS[zoned.dayOfWeek]
+  const zoned = zonedNow(date, location.timezone)
+  const hours = location.hours[zoned.dayOfWeek]
   if (!hours) return false
   return zoned.minutesSinceMidnight >= hours.openMinutes && zoned.minutesSinceMidnight < hours.closeMinutes
 }

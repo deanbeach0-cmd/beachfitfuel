@@ -15,3 +15,7 @@ export const LOCATION_IDS = {
   marshall:    process.env.SQUARE_LOCATION_ID_MARSHALL   ?? '',
   battleCreek: process.env.SQUARE_LOCATION_ID_BATTLE_CREEK ?? '',
 } as const
+
+export function squareLocationIdForSlug(slug: 'marshall' | 'battle-creek'): string {
+  return slug === 'marshall' ? LOCATION_IDS.marshall : LOCATION_IDS.battleCreek
+}

@@ -21,10 +21,13 @@ function makeLineId() {
 
 interface PickupCartState {
   items: PickupCartItem[]
+  /** True right after addItem cleared a different-location cart — cleared by consumers after showing a notice. */
+  justSwitchedLocation: boolean
   addItem: (item: NewCartItem) => void
   removeItem: (lineId: string) => void
   updateQuantity: (lineId: string, quantity: number) => void
   clearCart: () => void
+  acknowledgeLocationSwitch: () => void
   itemCount: () => number
   subtotalCents: () => number
 }
@@ -33,26 +36,40 @@ export const usePickupCartStore = create<PickupCartState>()(
   persist(
     (set, get) => ({
       items: [],
+      justSwitchedLocation: false,
 
       addItem: (incoming) => {
         set((state) => {
+          // A pickup order can only be fulfilled at one physical location —
+          // starting to order from a different one clears the old cart.
+          const existingLocation = state.items[0]?.locationSlug
+          const items =
+            existingLocation && existingLocation !== incoming.locationSlug ? [] : state.items
+          const switched = items.length === 0 && state.items.length > 0
+
           // Only merge into an existing line when the flavor selection matches
           // exactly — different flavor mixes of the same item are distinct lines.
-          const existing = state.items.find(
+          const existing = items.find(
             (i) => i.menuItemId === incoming.menuItemId && flavorsEqual(i.flavors, incoming.flavors)
           )
           if (existing) {
             return {
-              items: state.items.map((i) =>
+              justSwitchedLocation: switched,
+              items: items.map((i) =>
                 i.lineId === existing.lineId
                   ? { ...i, quantity: i.quantity + incoming.quantity }
                   : i
               ),
             }
           }
-          return { items: [...state.items, { ...incoming, lineId: makeLineId() }] }
+          return {
+            justSwitchedLocation: switched,
+            items: [...items, { ...incoming, lineId: makeLineId() }],
+          }
         })
       },
+
+      acknowledgeLocationSwitch: () => set({ justSwitchedLocation: false }),
 
       removeItem: (lineId) => {
         set((state) => ({

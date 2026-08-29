@@ -20,6 +20,7 @@ export type AdminMenuItem = Pick<
   | 'flavor_source_type'
   | 'flavor_modifier_list_id'
   | 'required_flavor_count'
+  | 'location_id'
 >
 
 export interface AdminFlavorSource {
@@ -29,22 +30,26 @@ export interface AdminFlavorSource {
 }
 
 export default async function AdminCategoriesPage() {
-  const [{ data: categories }, { data: items }, { data: modifierLists }, { data: itemModifierLinks }, { data: variations }] =
+  const [{ data: categories }, { data: items }, { data: modifierLists }, { data: itemModifierLinks }, { data: variations }, { data: locations }] =
     await Promise.all([
       supabaseAdmin.from('square_categories').select('*').order('square_category_name', { ascending: true }),
       supabaseAdmin
         .from('menu_items')
         .select(
-          'id, name, price, image_url, is_available, square_category_id, flavor_source_type, flavor_modifier_list_id, required_flavor_count'
+          'id, name, price, image_url, is_available, square_category_id, flavor_source_type, flavor_modifier_list_id, required_flavor_count, location_id'
         )
         .order('name', { ascending: true }),
       supabaseAdmin.from('square_modifier_lists').select('square_modifier_list_id, name'),
       supabaseAdmin.from('menu_item_modifier_lists').select('menu_item_id, square_modifier_list_id'),
       supabaseAdmin.from('square_item_variations').select('menu_item_id'),
+      supabaseAdmin.from('locations').select('id, name'),
     ])
 
   const categoryList = (categories ?? []) as SquareCategory[]
   const itemList = (items ?? []) as AdminMenuItem[]
+  const locationNameById: Record<string, string> = Object.fromEntries(
+    (locations ?? []).map((l) => [l.id, l.name])
+  )
 
   const modifierListNames = new Map((modifierLists ?? []).map((l) => [l.square_modifier_list_id, l.name]))
 
@@ -85,6 +90,7 @@ export default async function AdminCategoriesPage() {
             initialCategories={categoryList}
             allItems={itemList}
             flavorSourcesByItem={flavorSourcesByItem}
+            locationNameById={locationNameById}
           />
         )}
       </div>

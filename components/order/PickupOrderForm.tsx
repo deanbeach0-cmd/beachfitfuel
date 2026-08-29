@@ -8,7 +8,12 @@ import { usePickupCartStore } from '@/lib/pickup-cart-store'
 import { getPickupAvailability, PickupAvailability } from '@/lib/business-hours'
 import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
 import { SALES_TAX_RATE } from '@/lib/tax'
+import { LocationSlug, LOCATIONS } from '@/lib/locations'
 import type { PickupCustomer, PickupTime, FulfillmentType, ShippingAddress } from '@/types/pickup'
+
+interface PickupOrderFormProps {
+  locationSlug: LocationSlug
+}
 
 const TIP_PRESETS = [15, 20, 25] as const
 type TipOption = (typeof TIP_PRESETS)[number] | 'custom' | 'none'
@@ -44,9 +49,10 @@ const EMPTY_SHIPPING: ShippingAddress = {
   zip: '',
 }
 
-export function PickupOrderForm() {
+export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
   const { items, removeItem, updateQuantity, clearCart, subtotalCents } = usePickupCartStore()
   const router = useRouter()
+  const location = LOCATIONS[locationSlug]
 
   const [mounted, setMounted] = useState(false)
   const [customer, setCustomer] = useState<PickupCustomer>(EMPTY_CUSTOMER)
@@ -59,20 +65,30 @@ export function PickupOrderForm() {
   const [cardReady, setCardReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [locationSwitchNotice, setLocationSwitchNotice] = useState(false)
 
   const cardRef = useRef<any>(null)
   const cardContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMounted(true)
-    const avail = getPickupAvailability()
+    const avail = getPickupAvailability(locationSlug)
     setAvailability(avail)
     // Store closed right now — pre-select the first available slot so the
     // form always starts in a submittable state.
     if (!avail.openNow && avail.nextDay?.slots.length) {
       setCustomer((c) => ({ ...c, scheduledPickupAt: avail.nextDay!.slots[0].iso }))
     }
-  }, [])
+  }, [locationSlug])
+
+  // A cart built while ordering from the other location can't be fulfilled
+  // here — clear it and let the customer know, rather than silently mixing.
+  useEffect(() => {
+    if (items.length > 0 && items[0].locationSlug !== locationSlug) {
+      clearCart()
+      setLocationSwitchNotice(true)
+    }
+  }, [items, locationSlug, clearCart])
 
   const allItemsShippable = items.length > 0 && items.every((i) => i.shippable)
 
@@ -109,7 +125,7 @@ export function PickupOrderForm() {
   useEffect(() => {
     if (!squareLoaded || !cardContainerRef.current) return
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID
-    const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID
+    const locationId = location.publicSquareLocationId
     if (!appId || !locationId || !window.Square) return
 
     let isMounted = true
@@ -135,7 +151,7 @@ export function PickupOrderForm() {
     })
 
     return () => { isMounted = false }
-  }, [squareLoaded])
+  }, [squareLoaded, location.publicSquareLocationId])
 
   if (!mounted) return null
 
@@ -155,11 +171,16 @@ export function PickupOrderForm() {
   if (items.length === 0) {
     return (
       <div className="text-center py-20">
+        {locationSwitchNotice && (
+          <div className="max-w-md mx-auto mb-8 font-body text-sm bg-sky/10 border border-sky/30 rounded-xl px-4 py-3 text-dark/70">
+            Your cart had items from our other location, so we cleared it — orders can only be picked up from one spot.
+          </div>
+        )}
         <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-dark/20" />
         <h2 className="font-display text-2xl text-dark tracking-wide mb-3">YOUR ORDER IS EMPTY</h2>
         <p className="font-body text-dark/50 mb-8">Add drinks from the menu to get started.</p>
         <Link
-          href="/menu/marshall"
+          href={`/menu/${locationSlug}`}
           className="font-display tracking-widest text-white px-8 py-3 rounded-full inline-block"
           style={{ backgroundColor: '#FF7B9D' }}
         >
@@ -204,6 +225,7 @@ export function PickupOrderForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourceId,
+          locationSlug,
           items,
           customer,
           totalCents: total,
@@ -218,7 +240,9 @@ export function PickupOrderForm() {
 
       clearCart()
       const chargedTotal = ((data.totalCents ?? total) / 100).toFixed(2)
-      router.push(`/order/confirmation?orderId=${data.orderId}&total=${chargedTotal}&fulfillment=${fulfillment}`)
+      router.push(
+        `/order/confirmation?orderId=${data.orderId}&total=${chargedTotal}&fulfillment=${fulfillment}&location=${locationSlug}`
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -245,7 +269,7 @@ export function PickupOrderForm() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-xl tracking-widest text-dark">YOUR ORDER</h2>
             <Link
-              href="/menu/marshall"
+              href={`/menu/${locationSlug}`}
               className="font-body text-sm text-dark/40 hover:text-dark transition-colors"
             >
               + Add more
@@ -697,7 +721,7 @@ export function PickupOrderForm() {
               <span className="font-body text-sm text-right">
                 {fulfillment === 'SHIPMENT'
                   ? (shippingAddress.city ? `${shippingAddress.city}, ${shippingAddress.state}` : 'Your address')
-                  : '205 W Michigan Ave'}
+                  : location.address}
               </span>
             </div>
           </div>

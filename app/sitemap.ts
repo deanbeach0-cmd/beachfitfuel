@@ -25,8 +25,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${BASE_URL}/menu/battle-creek`,
       lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.6,
+      changeFrequency: 'daily',
+      priority: 0.9,
     },
     {
       url: `${BASE_URL}/order/marshall`,
@@ -37,8 +37,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${BASE_URL}/order/battle-creek`,
       lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
+      changeFrequency: 'weekly',
+      priority: 0.8,
     },
     {
       url: `${BASE_URL}/locations`,

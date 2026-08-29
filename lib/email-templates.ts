@@ -54,10 +54,11 @@ export function pickupOrderConfirmationEmail(params: {
   tipCents: number
   totalCents: number
   pickupTime: string
+  locationName: string
   fulfillment?: 'PICKUP' | 'SHIPMENT'
   shippingAddress?: EmailShippingAddress
 }): EmailTemplate {
-  const { customerName, orderId, items, subtotalCents, taxCents, shippingCents, tipCents, totalCents, pickupTime } = params
+  const { customerName, orderId, items, subtotalCents, taxCents, shippingCents, tipCents, totalCents, pickupTime, locationName } = params
   const isShipment = params.fulfillment === 'SHIPMENT' && params.shippingAddress
 
   const itemRows = items
@@ -96,7 +97,7 @@ export function pickupOrderConfirmationEmail(params: {
     <p style="font-size:14px;line-height:1.5;color:#2C2C2C99;margin:0 0 20px;">
       ${isShipment
         ? "Your order is confirmed and will ship via USPS. You're all paid up."
-        : "Your pickup order is confirmed for our Marshall location. You're all paid up — just come grab it."}
+        : `Your pickup order is confirmed for our ${locationName} location. You're all paid up — just come grab it.`}
     </p>
     <table style="width:100%;border-collapse:collapse;font-size:14px;">
       ${itemRows}

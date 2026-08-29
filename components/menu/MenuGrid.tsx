@@ -4,17 +4,20 @@ import { useState, useMemo } from 'react'
 import { MenuItem } from '@/types/menu'
 import { getCategoryStyle } from '@/lib/category-style'
 import { TO_GO_PACK_CATEGORY_ID } from '@/lib/shipping'
+import { LocationSlug } from '@/lib/locations'
 import { DrinkCard } from './DrinkCard'
 import { MenuFilter, CategoryFilterOption } from './MenuFilter'
+import { LocationSwitchNotice } from './LocationSwitchNotice'
 import { usePickupCartStore } from '@/lib/pickup-cart-store'
 
 interface MenuGridProps {
   items: MenuItem[]
   locationName: string
+  locationSlug: LocationSlug
   showOrderButton?: boolean
 }
 
-export function MenuGrid({ items, locationName, showOrderButton }: MenuGridProps) {
+export function MenuGrid({ items, locationName, locationSlug, showOrderButton }: MenuGridProps) {
   const [active, setActive] = useState<string>('all')
   const addItem = usePickupCartStore((s) => s.addItem)
 
@@ -47,6 +50,8 @@ export function MenuGrid({ items, locationName, showOrderButton }: MenuGridProps
 
   return (
     <div className="flex flex-col gap-8">
+      <LocationSwitchNotice />
+
       {/* Filter bar */}
       <MenuFilter active={active} onChange={setActive} categories={categories} counts={counts} />
 
@@ -62,6 +67,7 @@ export function MenuGrid({ items, locationName, showOrderButton }: MenuGridProps
             <DrinkCard
               key={item.id}
               item={item}
+              locationSlug={locationSlug}
               onAddToOrder={showOrderButton ? (menuItem) => {
                 const style = getCategoryStyle(menuItem.square_category_id ?? menuItem.id, menuItem.category_emoji, menuItem.category_color)
                 addItem({
@@ -72,6 +78,7 @@ export function MenuGrid({ items, locationName, showOrderButton }: MenuGridProps
                   emoji: style.emoji,
                   category: menuItem.category_name ?? 'Menu',
                   shippable: menuItem.square_category_id === TO_GO_PACK_CATEGORY_ID,
+                  locationSlug,
                 })
               } : undefined}
             />

@@ -4,18 +4,23 @@ import { notFound } from 'next/navigation'
 import { createServerComponentClient } from '@/lib/supabase'
 import { MenuItemDetail } from '@/components/menu/MenuItemDetail'
 import { FlavorOption, MenuItem } from '@/types/menu'
+import { getLocation, isLocationSlug, LOCATIONS } from '@/lib/locations'
 
 interface Props {
-  params: { itemId: string }
+  params: { location: string; itemId: string }
 }
 
-async function getItem(itemId: string): Promise<MenuItem | null> {
+export function generateStaticParams() {
+  return Object.keys(LOCATIONS).map((location) => ({ location }))
+}
+
+async function getItem(locationSlug: string, itemId: string): Promise<MenuItem | null> {
   const supabase = await createServerComponentClient()
 
   const { data: location } = await supabase
     .from('locations')
     .select('id')
-    .eq('slug', 'marshall')
+    .eq('slug', locationSlug)
     .single()
 
   const { data: item } = await supabase
@@ -42,16 +47,21 @@ async function getFlavorOptions(item: MenuItem): Promise<FlavorOption[]> {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const item = await getItem(params.itemId)
+  const location = getLocation(params.location)
+  if (!location) return { title: 'Menu Item' }
+  const item = await getItem(location.slug, params.itemId)
   if (!item) return { title: 'Menu Item' }
   return {
     title: item.name,
-    description: item.description ?? `${item.name} — BeachFit Fuel Marshall`,
+    description: item.description ?? `${item.name} — BeachFit Fuel ${location.name}`,
   }
 }
 
 export default async function MenuItemPage({ params }: Props) {
-  const item = await getItem(params.itemId)
+  if (!isLocationSlug(params.location)) notFound()
+  const location = LOCATIONS[params.location]
+
+  const item = await getItem(location.slug, params.itemId)
   if (!item) notFound()
 
   const flavorOptions = await getFlavorOptions(item)
@@ -60,12 +70,12 @@ export default async function MenuItemPage({ params }: Props) {
     <div className="min-h-screen" style={{ backgroundColor: '#FFF8EE' }}>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
-          href="/menu/marshall"
+          href={`/menu/${location.slug}`}
           className="font-body text-dark/50 text-sm hover:text-teal transition-colors mb-8 inline-block"
         >
           ← Back to Menu
         </Link>
-        <MenuItemDetail item={item} flavorOptions={flavorOptions} />
+        <MenuItemDetail item={item} locationSlug={location.slug} flavorOptions={flavorOptions} />
       </div>
     </div>
   )

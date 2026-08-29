@@ -13,6 +13,7 @@ export interface PickupCartItem {
   category: string
   flavors?: FlavorSelection[] // set when the item required flavor picking
   shippable?: boolean // true for To-Go Pack items — eligible for USPS shipping
+  locationSlug: string // which location this line is fulfilled at — a cart can only hold one location at a time
 }
 
 export type PickupTime = 'ASAP' | '15min' | '30min' | '45min' | '1hr'

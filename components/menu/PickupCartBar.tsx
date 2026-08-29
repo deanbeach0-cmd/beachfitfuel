@@ -4,8 +4,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ShoppingBag } from 'lucide-react'
 import { usePickupCartStore } from '@/lib/pickup-cart-store'
+import { LocationSlug } from '@/lib/locations'
 
-export function PickupCartBar() {
+interface PickupCartBarProps {
+  locationSlug: LocationSlug
+}
+
+export function PickupCartBar({ locationSlug }: PickupCartBarProps) {
   const [mounted, setMounted] = useState(false)
   const itemCount = usePickupCartStore((s) => s.itemCount())
   const subtotalCents = usePickupCartStore((s) => s.subtotalCents())
@@ -22,7 +27,7 @@ export function PickupCartBar() {
       style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
     >
       <Link
-        href="/order/marshall"
+        href={`/order/${locationSlug}`}
         className="flex items-center justify-between max-w-lg mx-auto px-5 py-4 rounded-2xl shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
         style={{ backgroundColor: '#FF7B9D' }}
       >

@@ -9,9 +9,10 @@ const quickLinks = [
 ]
 
 const orderLinks = [
-  { href: '/order/marshall',     label: 'Order — Marshall' },
-  { href: '/shop/to-go-packs',   label: 'To-Go Packs' },
-  { href: '/shop/apparel',       label: 'Apparel' },
+  { href: '/order/marshall',      label: 'Order — Marshall' },
+  { href: '/order/battle-creek',  label: 'Order — Battle Creek' },
+  { href: '/shop/to-go-packs',    label: 'To-Go Packs' },
+  { href: '/shop/apparel',        label: 'Apparel' },
 ]
 
 export function Footer() {

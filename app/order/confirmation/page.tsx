@@ -1,14 +1,15 @@
 import Link from 'next/link'
 import { MapPin, Phone } from 'lucide-react'
 import type { Metadata } from 'next'
+import { getLocation, LOCATIONS } from '@/lib/locations'
 
 export const metadata: Metadata = {
   title: 'Order Confirmed — BeachFit Fuel',
-  description: 'Your pickup order has been placed at BeachFit Fuel Marshall.',
+  description: 'Your pickup order has been placed.',
 }
 
 interface PageProps {
-  searchParams: Promise<{ orderId?: string; total?: string; fulfillment?: string }>
+  searchParams: Promise<{ orderId?: string; total?: string; fulfillment?: string; location?: string }>
 }
 
 export default async function OrderConfirmationPage({ searchParams }: PageProps) {
@@ -16,6 +17,7 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
   const orderId = params.orderId ?? ''
   const total = params.total ?? '0.00'
   const isShipment = params.fulfillment === 'SHIPMENT'
+  const location = getLocation(params.location ?? '') ?? LOCATIONS.marshall
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16" style={{ backgroundColor: '#FFF8EE' }}>
@@ -37,7 +39,7 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
           <p className="font-body text-dark/60 mt-3 text-base leading-relaxed">
             {isShipment
               ? "We got it — your order will ship via USPS."
-              : 'We got it — your drinks will be ready for pickup at Marshall.'}
+              : `We got it — your drinks will be ready for pickup at ${location.name}.`}
           </p>
         </div>
 
@@ -70,16 +72,16 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
               <div className="flex items-start gap-2">
                 <MapPin size={14} className="text-dark/40 mt-0.5 flex-shrink-0" />
                 <span className="font-body text-dark/60 text-sm">
-                  205 W Michigan Ave, Marshall, MI 49068
+                  {location.address}, {location.city}, {location.state} {location.zip}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone size={14} className="text-dark/40 flex-shrink-0" />
                 <a
-                  href="tel:+12692343645"
+                  href={location.phoneHref}
                   className="font-body text-dark/60 text-sm hover:text-dark transition-colors"
                 >
-                  (269) 234-3645
+                  {location.phoneDisplay}
                 </a>
               </div>
             </div>
@@ -96,7 +98,7 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-3 w-full">
           <Link
-            href="/menu/marshall"
+            href={`/menu/${location.slug}`}
             className="flex-1 text-center font-display tracking-widest text-white text-base py-4 rounded-full transition-transform hover:scale-[1.02]"
             style={{ backgroundColor: '#FF7B9D' }}
           >

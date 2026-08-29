@@ -7,8 +7,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-type UpsertRow = {
-  location_id: string
+type ItemData = {
   square_item_id: string
   square_category_id: string | null
   name: string
@@ -16,7 +15,11 @@ type UpsertRow = {
   price: number
   image_url: string | null
   image_urls: string[] | null
+  modifierListIds: string[]
+  variations: { square_variation_id: string; name: string; price_cents: number; display_order: number }[]
 }
+
+type LocationRow = { id: string; slug: string }
 
 // Shared by both triggers: POST for manual/curl syncs, GET for Vercel Cron
 // (which calls scheduled routes with GET + an Authorization bearer header).
@@ -43,16 +46,17 @@ export async function POST(request: NextRequest) {
 
 async function runSync() {
   try {
-    // Get Marshall's Supabase location ID
-    const { data: location, error: locationError } = await supabaseAdmin
+    // Every active, Square-linked location gets the same catalog synced to
+    // it — Square confirms identical items/pricing at both locations today.
+    const { data: locations, error: locationsError } = await supabaseAdmin
       .from('locations')
-      .select('id')
-      .eq('slug', 'marshall')
-      .single()
+      .select('id, slug')
+      .eq('is_active', true)
+      .not('square_location_id', 'is', null)
 
-    if (locationError || !location) {
+    if (locationsError || !locations || locations.length === 0) {
       return NextResponse.json(
-        { error: 'Marshall location not found in Supabase' },
+        { error: 'No active, Square-linked locations found in Supabase' },
         { status: 500 }
       )
     }
@@ -84,8 +88,9 @@ async function runSync() {
     }
 
     // --- Sync categories first. square_categories IS the site's category
-    // taxonomy — is_visible/emoji/color are owned by /admin/categories and
-    // never overwritten here, only square_category_name is kept in sync. ---
+    // taxonomy (shared across all locations) — is_visible/emoji/color are
+    // owned by /admin/categories and never overwritten here, only
+    // square_category_name is kept in sync. ---
     const categoryRows = squareCategories
       .filter((c) => typeof c.id === 'string')
       .map((c) => ({
@@ -117,7 +122,8 @@ async function runSync() {
     }
 
     // --- Sync modifier lists (e.g. "To Go Pack Flavors") — raw data only,
-    // which list is actually used as an item's flavor picker is an admin choice. ---
+    // shared across locations; which list is actually used as an item's
+    // flavor picker is an admin choice. ---
     const modifierListRows = squareModifierLists
       .filter((l) => typeof l.id === 'string')
       .map((l) => ({
@@ -178,11 +184,9 @@ async function runSync() {
       })
     }
 
-    // Map Square items → Supabase rows (only Square-owned fields)
-    const rows: (UpsertRow & {
-      modifierListIds: string[]
-      variations: { square_variation_id: string; name: string; price_cents: number; display_order: number }[]
-    })[] = squareItems
+    // Map Square items → item data (location-independent — the same catalog
+    // data gets mirrored onto every active location below)
+    const items: ItemData[] = squareItems
       .filter((item) => typeof item.id === 'string')
       .map((item) => {
         const itemData = item.itemData as Record<string, unknown> | undefined
@@ -236,7 +240,6 @@ async function runSync() {
           })
 
         return {
-          location_id: location.id as string,
           square_item_id: item.id as string,
           square_category_id: squareCategoryId,
           name: (itemData?.name as string | undefined) ?? 'Unnamed Item',
@@ -252,19 +255,32 @@ async function runSync() {
         }
       })
 
-    // Fetch existing rows to distinguish adds from updates
+    // Fetch existing rows to distinguish adds from updates — keyed by
+    // (square_item_id, location_id) since each location gets its own row.
     const { data: existing } = await supabaseAdmin
       .from('menu_items')
-      .select('id, square_item_id')
+      .select('id, square_item_id, location_id')
       .not('square_item_id', 'is', null)
 
-    const existingMap = new Map<string, string>()
+    const existingMap = new Map<string, string>() // `${square_item_id}:${location_id}` -> menu_items.id
     for (const row of existing ?? []) {
-      if (row.square_item_id) existingMap.set(row.square_item_id, row.id)
+      if (row.square_item_id) existingMap.set(`${row.square_item_id}:${row.location_id}`, row.id)
     }
 
-    const toInsert = rows.filter((r) => !existingMap.has(r.square_item_id))
-    const toUpdate = rows.filter((r) => existingMap.has(r.square_item_id))
+    const keyFor = (item: ItemData, locationId: string) => `${item.square_item_id}:${locationId}`
+
+    const toInsert: (ItemData & { location_id: string })[] = []
+    const toUpdate: (ItemData & { location_id: string })[] = []
+    for (const location of locations as LocationRow[]) {
+      for (const item of items) {
+        const tagged = { ...item, location_id: location.id }
+        if (existingMap.has(keyFor(item, location.id))) {
+          toUpdate.push(tagged)
+        } else {
+          toInsert.push(tagged)
+        }
+      }
+    }
 
     // New items default to available; visibility is controlled entirely by
     // /admin/categories (category-level) and /admin/categories item toggles
@@ -287,17 +303,17 @@ async function runSync() {
       // Re-fetch to pick up the newly assigned ids for the just-inserted items
       const { data: refreshed } = await supabaseAdmin
         .from('menu_items')
-        .select('id, square_item_id')
+        .select('id, square_item_id, location_id')
         .in('square_item_id', toInsert.map((r) => r.square_item_id))
       for (const row of refreshed ?? []) {
-        if (row.square_item_id) existingMap.set(row.square_item_id, row.id)
+        if (row.square_item_id) existingMap.set(`${row.square_item_id}:${row.location_id}`, row.id)
       }
     }
 
     // Update existing items — only Square-owned fields. is_available is
     // site-owned (admin can hide an item) and must never be reset here.
     for (const item of toUpdate) {
-      const rowId = existingMap.get(item.square_item_id)!
+      const rowId = existingMap.get(keyFor(item, item.location_id))!
       const { error: updateError } = await supabaseAdmin
         .from('menu_items')
         .update({
@@ -317,15 +333,18 @@ async function runSync() {
 
     // --- Sync each item's modifier-list attachments and variations (raw
     // data — full replace per item keeps it accurate as Square changes). ---
-    const menuItemIds = rows.map((r) => existingMap.get(r.square_item_id)).filter((id): id is string => !!id)
+    const allTagged = [...toInsert, ...toUpdate]
+    const menuItemIds = allTagged
+      .map((r) => existingMap.get(keyFor(r, r.location_id)))
+      .filter((id): id is string => !!id)
 
     if (menuItemIds.length > 0) {
       await supabaseAdmin.from('menu_item_modifier_lists').delete().in('menu_item_id', menuItemIds)
       await supabaseAdmin.from('square_item_variations').delete().in('menu_item_id', menuItemIds)
     }
 
-    const modifierLinkRows = rows.flatMap((r) => {
-      const menuItemId = existingMap.get(r.square_item_id)
+    const modifierLinkRows = allTagged.flatMap((r) => {
+      const menuItemId = existingMap.get(keyFor(r, r.location_id))
       if (!menuItemId) return []
       return r.modifierListIds.map((square_modifier_list_id) => ({ menu_item_id: menuItemId, square_modifier_list_id }))
     })
@@ -334,8 +353,8 @@ async function runSync() {
       if (error) throw new Error(`Modifier link insert failed: ${error.message}`)
     }
 
-    const variationRows = rows.flatMap((r) => {
-      const menuItemId = existingMap.get(r.square_item_id)
+    const variationRows = allTagged.flatMap((r) => {
+      const menuItemId = existingMap.get(keyFor(r, r.location_id))
       if (!menuItemId || r.variations.length <= 1) return []
       return r.variations.map((v) => ({ ...v, menu_item_id: menuItemId }))
     })
@@ -348,16 +367,12 @@ async function runSync() {
       success: true,
       added: toInsert.length,
       updated: toUpdate.length,
-      total: rows.length,
+      total: allTagged.length,
+      locations: (locations as LocationRow[]).map((l) => l.slug),
       categories: { added: categoriesToInsert.length, updated: categoriesToUpdate.length },
       modifierLists: modifierListRows.length,
       modifiers: modifierRows.length,
-      items: rows.map((r) => ({
-        name: r.name,
-        squareId: r.square_item_id,
-        price: r.price,
-        status: existingMap.has(r.square_item_id) ? 'updated' : 'added',
-      })),
+      items: items.map((r) => ({ name: r.name, squareId: r.square_item_id, price: r.price })),
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
