@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { MapPin, Phone, Instagram, Facebook } from 'lucide-react'
+import { LOCATIONS } from '@/lib/locations'
 
 const quickLinks = [
   { href: '/menu',      label: 'Menu' },
@@ -96,11 +97,6 @@ export function Footer() {
                   </Link>
                 </li>
               ))}
-              <li>
-                <span className="font-body text-white/40 text-sm">
-                  Battle Creek — Coming Soon
-                </span>
-              </li>
             </ul>
           </div>
 
@@ -113,27 +109,28 @@ export function Footer() {
                 <p className="font-display text-base tracking-widest text-white">MARSHALL</p>
                 <div className="flex items-start gap-2 text-white/60 text-sm">
                   <MapPin size={14} className="mt-0.5 flex-shrink-0 text-[#6FBDB8]" />
-                  <span className="font-body">205 W Michigan Ave<br />Marshall, MI</span>
+                  <span className="font-body">{LOCATIONS.marshall.address}<br />{LOCATIONS.marshall.city}, {LOCATIONS.marshall.state}</span>
                 </div>
                 <div className="flex items-center gap-2 text-white/60 text-sm">
                   <Phone size={14} className="flex-shrink-0 text-[#6FBDB8]" />
-                  <a href="tel:+12692343645" className="font-body hover:text-white transition-colors">
-                    (269) 234-3645
+                  <a href={LOCATIONS.marshall.phoneHref} className="font-body hover:text-white transition-colors">
+                    {LOCATIONS.marshall.phoneDisplay}
                   </a>
                 </div>
               </div>
               {/* Battle Creek */}
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-display text-base tracking-widest text-white">BATTLE CREEK</p>
-                  <span
-                    className="font-body text-xs px-2 py-0.5 rounded-full font-bold"
-                    style={{ backgroundColor: '#FAB65F', color: '#2C2C2C' }}
-                  >
-                    COMING SOON
-                  </span>
+                <p className="font-display text-base tracking-widest text-white">BATTLE CREEK</p>
+                <div className="flex items-start gap-2 text-white/60 text-sm">
+                  <MapPin size={14} className="mt-0.5 flex-shrink-0 text-[#FAB65F]" />
+                  <span className="font-body">{LOCATIONS['battle-creek'].address}<br />{LOCATIONS['battle-creek'].city}, {LOCATIONS['battle-creek'].state}</span>
                 </div>
-                <p className="font-body text-white/40 text-sm">Battle Creek, MI</p>
+                <div className="flex items-center gap-2 text-white/60 text-sm">
+                  <Phone size={14} className="flex-shrink-0 text-[#FAB65F]" />
+                  <a href={LOCATIONS['battle-creek'].phoneHref} className="font-body hover:text-white transition-colors">
+                    {LOCATIONS['battle-creek'].phoneDisplay}
+                  </a>
+                </div>
               </div>
             </div>
           </div>

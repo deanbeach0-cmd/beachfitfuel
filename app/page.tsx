@@ -299,7 +299,7 @@ export default async function HomePage() {
               GET THE GOOD STUFF FIRST
             </h2>
             <p className="font-body text-white/60 mt-2 text-base">
-              New flavors, specials, Battle Creek opening news — straight to your inbox.
+              New flavors, specials, and drops from both locations — straight to your inbox.
             </p>
           </div>
 

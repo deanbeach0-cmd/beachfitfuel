@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Heart, Zap, Users } from 'lucide-react'
 import type { Metadata } from 'next'
+import { LOCATIONS } from '@/lib/locations'
 
 export const metadata: Metadata = {
   title: 'Our Story',
@@ -228,11 +229,11 @@ export default function OurStoryPage() {
             </div>
             <div
               className="flex-1 rounded-2xl p-5 text-center"
-              style={{ backgroundColor: 'white', border: '1.5px dashed #FAB65F' }}
+              style={{ backgroundColor: 'white', border: '1.5px solid #FAB65F44' }}
             >
               <p className="font-display text-xl tracking-widest text-dark">BATTLE CREEK</p>
-              <p className="font-body text-dark/60 text-sm mt-1">Battle Creek, MI</p>
-              <p className="font-body text-xs mt-0.5" style={{ color: '#EC8A1E' }}>Opening Soon</p>
+              <p className="font-body text-dark/60 text-sm mt-1">{LOCATIONS['battle-creek'].address}</p>
+              <p className="font-body text-dark/40 text-xs mt-0.5">Open Now</p>
             </div>
           </div>
           <Link
