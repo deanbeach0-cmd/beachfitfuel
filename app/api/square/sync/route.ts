@@ -7,19 +7,34 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+type ItemVariation = {
+  square_variation_id: string
+  name: string
+  price_cents: number
+  /** Square location id -> overridden price in cents, from itemVariationData.locationOverrides */
+  priceOverridesCents: Record<string, number>
+  display_order: number
+}
+
 type ItemData = {
   square_item_id: string
   square_category_id: string | null
   name: string
   description: string | null
   price: number
+  /** Square location id -> overridden price in dollars, from the primary variation */
+  priceOverrides: Record<string, number>
   image_url: string | null
   image_urls: string[] | null
   modifierListIds: string[]
-  variations: { square_variation_id: string; name: string; price_cents: number; display_order: number }[]
+  variations: ItemVariation[]
 }
 
-type LocationRow = { id: string; slug: string }
+type LocationRow = { id: string; slug: string; square_location_id: string }
+
+function resolvePriceForLocation(basePrice: number, overrides: Record<string, number>, squareLocationId: string): number {
+  return overrides[squareLocationId] ?? basePrice
+}
 
 // Shared by both triggers: POST for manual/curl syncs, GET for Vercel Cron
 // (which calls scheduled routes with GET + an Authorization bearer header).
@@ -50,7 +65,7 @@ async function runSync() {
     // it — Square confirms identical items/pricing at both locations today.
     const { data: locations, error: locationsError } = await supabaseAdmin
       .from('locations')
-      .select('id, slug')
+      .select('id, slug, square_location_id')
       .eq('is_active', true)
       .not('square_location_id', 'is', null)
 
@@ -199,11 +214,19 @@ async function runSync() {
               'FIXED_PRICING'
           ) ?? variations[0]
 
-        const priceMoney = (
-          (regularVariation?.itemVariationData as Record<string, unknown> | undefined)
-            ?.priceMoney as Record<string, unknown> | undefined
-        )
+        const regularVariationData = regularVariation?.itemVariationData as Record<string, unknown> | undefined
+        const priceMoney = regularVariationData?.priceMoney as Record<string, unknown> | undefined
         const price = priceMoney?.amount ? Number(priceMoney.amount) / 100 : 0
+
+        const priceOverrides: Record<string, number> = {}
+        const regularOverrides = (regularVariationData?.locationOverrides as Record<string, unknown>[] | undefined) ?? []
+        for (const o of regularOverrides) {
+          const locId = o.locationId as string | undefined
+          const overrideMoney = o.priceMoney as Record<string, unknown> | undefined
+          if (locId && overrideMoney?.amount != null) {
+            priceOverrides[locId] = Number(overrideMoney.amount) / 100
+          }
+        }
 
         // Some items have several photos in Square — keep the full set for the
         // detail-page gallery, not just the first one.
@@ -226,15 +249,25 @@ async function runSync() {
           .map((m) => m.modifierListId as string | undefined)
           .filter((id): id is string => !!id)
 
-        const itemVariations = variations
+        const itemVariations: ItemVariation[] = variations
           .filter((v) => typeof v.id === 'string')
           .map((v) => {
             const vd = v.itemVariationData as Record<string, unknown> | undefined
             const vPriceMoney = vd?.priceMoney as Record<string, unknown> | undefined
+            const vOverrides = (vd?.locationOverrides as Record<string, unknown>[] | undefined) ?? []
+            const priceOverridesCents: Record<string, number> = {}
+            for (const o of vOverrides) {
+              const locId = o.locationId as string | undefined
+              const overrideMoney = o.priceMoney as Record<string, unknown> | undefined
+              if (locId && overrideMoney?.amount != null) {
+                priceOverridesCents[locId] = Number(overrideMoney.amount)
+              }
+            }
             return {
               square_variation_id: v.id as string,
               name: (vd?.name as string | undefined) ?? 'Regular',
               price_cents: vPriceMoney?.amount ? Number(vPriceMoney.amount) : 0,
+              priceOverridesCents,
               display_order: (vd?.ordinal as number | undefined) ?? 0,
             }
           })
@@ -248,6 +281,7 @@ async function runSync() {
             (itemData?.description as string | undefined) ??
             null,
           price,
+          priceOverrides,
           image_url: imageUrl,
           image_urls: imageUrls,
           modifierListIds,
@@ -269,11 +303,20 @@ async function runSync() {
 
     const keyFor = (item: ItemData, locationId: string) => `${item.square_item_id}:${locationId}`
 
-    const toInsert: (ItemData & { location_id: string })[] = []
-    const toUpdate: (ItemData & { location_id: string })[] = []
+    type TaggedItem = ItemData & { location_id: string; square_location_id: string }
+
+    const toInsert: TaggedItem[] = []
+    const toUpdate: TaggedItem[] = []
     for (const location of locations as LocationRow[]) {
       for (const item of items) {
-        const tagged = { ...item, location_id: location.id }
+        // Per-location price overrides from Square (e.g. a flavor priced
+        // differently at one location) win over the item's base price.
+        const tagged: TaggedItem = {
+          ...item,
+          location_id: location.id,
+          square_location_id: location.square_location_id,
+          price: resolvePriceForLocation(item.price, item.priceOverrides, location.square_location_id),
+        }
         if (existingMap.has(keyFor(item, location.id))) {
           toUpdate.push(tagged)
         } else {
@@ -356,7 +399,13 @@ async function runSync() {
     const variationRows = allTagged.flatMap((r) => {
       const menuItemId = existingMap.get(keyFor(r, r.location_id))
       if (!menuItemId || r.variations.length <= 1) return []
-      return r.variations.map((v) => ({ ...v, menu_item_id: menuItemId }))
+      return r.variations.map((v) => ({
+        square_variation_id: v.square_variation_id,
+        menu_item_id: menuItemId,
+        name: v.name,
+        price_cents: v.priceOverridesCents[r.square_location_id] ?? v.price_cents,
+        display_order: v.display_order,
+      }))
     })
     if (variationRows.length > 0) {
       const { error } = await supabaseAdmin.from('square_item_variations').insert(variationRows)

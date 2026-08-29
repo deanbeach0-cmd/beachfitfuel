@@ -10,9 +10,9 @@ interface Props {
   params: { location: string; itemId: string }
 }
 
-export function generateStaticParams() {
-  return Object.keys(LOCATIONS).map((location) => ({ location }))
-}
+// No generateStaticParams here — item IDs are numerous and change with the
+// menu, so these render dynamically per-request rather than being
+// pre-rendered at build time (unlike the [location] listing page above it).
 
 async function getItem(locationSlug: string, itemId: string): Promise<MenuItem | null> {
   const supabase = await createServerComponentClient()
