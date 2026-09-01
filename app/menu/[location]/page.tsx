@@ -4,7 +4,7 @@ import { MenuGrid } from '@/components/menu/MenuGrid'
 import { PickupCartBar } from '@/components/menu/PickupCartBar'
 import { WaveDivider } from '@/components/shared/WaveDivider'
 import { MenuItem } from '@/types/menu'
-import { getLocation, isLocationSlug, LOCATIONS, getDisplayHoursRows } from '@/lib/locations'
+import { getLocation, isLocationSlug, LOCATIONS, getDisplayHoursRows, DayHours } from '@/lib/locations'
 import { MapPin, Phone, Clock } from 'lucide-react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -36,7 +36,7 @@ export default async function LocationMenuPage({ params }: Props) {
 
   const { data: dbLocation } = await supabase
     .from('locations')
-    .select('id')
+    .select('id, hours')
     .eq('slug', location.slug)
     .single()
 
@@ -49,7 +49,8 @@ export default async function LocationMenuPage({ params }: Props) {
     .order('display_order', { ascending: true })
 
   const menuItems: MenuItem[] = (items ?? []) as MenuItem[]
-  const weekdayHours = getDisplayHoursRows(location)[0]
+  const hours = (dbLocation?.hours as Record<number, DayHours | null> | undefined) ?? location.hours
+  const weekdayHours = getDisplayHoursRows(hours)[0]
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FFF8EE' }}>

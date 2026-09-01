@@ -14,6 +14,16 @@ interface CategoryManagerProps {
   locationNameById: Record<string, string>
 }
 
+// One row per Square item, one per-location row folded into `rows` — keeps
+// hiding an item at one location from silently leaving it visible at the
+// other, which isn't obvious when each location's row is listed separately.
+interface GroupedItem {
+  groupKey: string
+  name: string
+  image_url: string | null
+  rows: AdminMenuItem[]
+}
+
 export function CategoryManager({ initialCategories, allItems, flavorSourcesByItem, locationNameById }: CategoryManagerProps) {
   const [categories, setCategories] = useState(initialCategories)
   const [items, setItems] = useState(allItems)
@@ -22,15 +32,33 @@ export function CategoryManager({ initialCategories, allItems, flavorSourcesByIt
   const [errorKey, setErrorKey] = useState<string | null>(null)
 
   const itemsByCategory = useMemo(() => {
-    const map = new Map<string, AdminMenuItem[]>()
+    const groupsByKey = new Map<string, GroupedItem>()
+    const byCategory = new Map<string, GroupedItem[]>()
+
     items.forEach((item) => {
       if (!item.square_category_id) return
-      const list = map.get(item.square_category_id) ?? []
-      list.push(item)
-      map.set(item.square_category_id, list)
+      const groupKey = item.square_item_id ?? item.id
+      let group = groupsByKey.get(groupKey)
+      if (!group) {
+        group = { groupKey, name: item.name, image_url: item.image_url, rows: [] }
+        groupsByKey.set(groupKey, group)
+        const list = byCategory.get(item.square_category_id) ?? []
+        list.push(group)
+        byCategory.set(item.square_category_id, list)
+      }
+      group.rows.push(item)
     })
-    return map
-  }, [items])
+
+    for (const list of Array.from(byCategory.values())) {
+      list.sort((a: GroupedItem, b: GroupedItem) => a.name.localeCompare(b.name))
+      for (const group of list) {
+        group.rows.sort((a: AdminMenuItem, b: AdminMenuItem) =>
+          (locationNameById[a.location_id] ?? '').localeCompare(locationNameById[b.location_id] ?? '')
+        )
+      }
+    }
+    return byCategory
+  }, [items, locationNameById])
 
   async function updateCategory(
     squareCategoryId: string,
@@ -83,6 +111,20 @@ export function CategoryManager({ initialCategories, allItems, flavorSourcesByIt
     }
   }
 
+  // Flavor-picker config is conceptually one setting per item, not per
+  // location — apply it to every location's row for this item at once so
+  // they can't drift out of sync with each other.
+  function updateFlavorConfig(
+    group: GroupedItem,
+    patch: {
+      flavor_source_type?: 'modifier' | 'variation' | null
+      flavor_modifier_list_id?: string | null
+      required_flavor_count?: number | null
+    }
+  ) {
+    group.rows.forEach((row) => updateItem(row.id, patch))
+  }
+
   // Encodes a flavor source as a single <select> value: "modifier:<listId>" or "variation:variation"
   function sourceValue(item: AdminMenuItem): string {
     if (!item.flavor_source_type) return ''
@@ -90,16 +132,16 @@ export function CategoryManager({ initialCategories, allItems, flavorSourcesByIt
     return `modifier:${item.flavor_modifier_list_id ?? ''}`
   }
 
-  function handleSourceChange(item: AdminMenuItem, value: string) {
+  function handleSourceChange(group: GroupedItem, value: string) {
     if (!value) {
-      updateItem(item.id, { flavor_source_type: null, flavor_modifier_list_id: null, required_flavor_count: null })
+      updateFlavorConfig(group, { flavor_source_type: null, flavor_modifier_list_id: null, required_flavor_count: null })
       return
     }
     const [type, id] = value.split(':') as ['modifier' | 'variation', string]
-    updateItem(item.id, {
+    updateFlavorConfig(group, {
       flavor_source_type: type,
       flavor_modifier_list_id: type === 'modifier' ? id : null,
-      required_flavor_count: item.required_flavor_count ?? 1,
+      required_flavor_count: group.rows[0].required_flavor_count ?? 1,
     })
   }
 
@@ -175,29 +217,26 @@ export function CategoryManager({ initialCategories, allItems, flavorSourcesByIt
                 ) : (
                   <table className="w-full text-left font-body text-sm">
                     <tbody>
-                      {categoryItems.map((item) => {
-                        const sources = flavorSourcesByItem[item.id] ?? []
+                      {categoryItems.map((group) => {
+                        const sources = flavorSourcesByItem[group.rows[0].id] ?? []
                         return (
-                        <tr key={item.id} className="border-b border-dark/5 last:border-0 align-top">
+                        <tr key={group.groupKey} className="border-b border-dark/5 last:border-0 align-top">
                           <td className="py-2 pr-3 w-10">
                             <div className="relative w-8 h-8 rounded-md overflow-hidden bg-white flex-shrink-0">
-                              {item.image_url ? (
-                                <Image src={item.image_url} alt={item.name} fill className="object-cover" sizes="32px" />
+                              {group.image_url ? (
+                                <Image src={group.image_url} alt={group.name} fill className="object-cover" sizes="32px" />
                               ) : (
                                 <span className="flex items-center justify-center w-full h-full text-xs">{style.emoji}</span>
                               )}
                             </div>
                           </td>
                           <td className="py-2 pr-3 text-dark">
-                            {item.name}
-                            <span className="ml-2 inline-block font-body text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-dark/5 text-dark/50">
-                              {locationNameById[item.location_id] ?? 'Unknown location'}
-                            </span>
+                            {group.name}
                             {sources.length > 0 && (
                               <div className="flex items-center gap-2 mt-1.5">
                                 <select
-                                  value={sourceValue(item)}
-                                  onChange={(e) => handleSourceChange(item, e.target.value)}
+                                  value={sourceValue(group.rows[0])}
+                                  onChange={(e) => handleSourceChange(group, e.target.value)}
                                   className="border border-dark/15 rounded-lg px-2 py-1 text-xs bg-white"
                                 >
                                   <option value="">— No flavor picker —</option>
@@ -207,15 +246,15 @@ export function CategoryManager({ initialCategories, allItems, flavorSourcesByIt
                                     </option>
                                   ))}
                                 </select>
-                                {item.flavor_source_type && (
+                                {group.rows[0].flavor_source_type && (
                                   <label className="flex items-center gap-1 text-xs text-dark/60">
                                     Requires
                                     <input
                                       type="number"
                                       min={1}
-                                      value={item.required_flavor_count ?? 1}
+                                      value={group.rows[0].required_flavor_count ?? 1}
                                       onChange={(e) =>
-                                        updateItem(item.id, { required_flavor_count: Number(e.target.value) || 1 })
+                                        updateFlavorConfig(group, { required_flavor_count: Number(e.target.value) || 1 })
                                       }
                                       className="w-12 border border-dark/15 rounded-lg px-1.5 py-1 text-center"
                                     />
@@ -225,24 +264,30 @@ export function CategoryManager({ initialCategories, allItems, flavorSourcesByIt
                               </div>
                             )}
                           </td>
-                          <td className="py-2 pr-3 text-dark/50">${Number(item.price).toFixed(2)}</td>
                           <td className="py-2 text-right">
-                            <label className="inline-flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={item.is_available}
-                                onChange={(e) => updateItem(item.id, { is_available: e.target.checked })}
-                              />
-                              <span className="text-dark/70">
-                                {savingKey === item.id
-                                  ? 'Saving…'
-                                  : errorKey === item.id
-                                  ? 'Failed'
-                                  : item.is_available
-                                  ? 'Visible'
-                                  : 'Hidden'}
-                              </span>
-                            </label>
+                            <div className="flex flex-col gap-1.5 items-end">
+                              {group.rows.map((row) => (
+                                <label key={row.id} className="inline-flex items-center gap-2 cursor-pointer">
+                                  <span className="text-dark/40 text-xs w-24 text-right">
+                                    {locationNameById[row.location_id] ?? 'Unknown'} · ${Number(row.price).toFixed(2)}
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={row.is_available}
+                                    onChange={(e) => updateItem(row.id, { is_available: e.target.checked })}
+                                  />
+                                  <span className="text-dark/70 w-16">
+                                    {savingKey === row.id
+                                      ? 'Saving…'
+                                      : errorKey === row.id
+                                      ? 'Failed'
+                                      : row.is_available
+                                      ? 'Visible'
+                                      : 'Hidden'}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
                           </td>
                         </tr>
                         )

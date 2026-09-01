@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { PickupOrderForm } from '@/components/order/PickupOrderForm'
 import { getLocation, isLocationSlug, LOCATIONS, getDisplayHoursRows } from '@/lib/locations'
+import { getLocationHours } from '@/lib/location-hours'
 
 interface Props {
   params: { location: string }
@@ -22,10 +23,11 @@ export function generateMetadata({ params }: Props): Metadata {
   }
 }
 
-export default function LocationOrderPage({ params }: Props) {
+export default async function LocationOrderPage({ params }: Props) {
   if (!isLocationSlug(params.location)) notFound()
   const location = LOCATIONS[params.location]
-  const hoursRows = getDisplayHoursRows(location)
+  const hours = await getLocationHours(location.slug)
+  const hoursRows = getDisplayHoursRows(hours)
   const mapsQuery = encodeURIComponent(`${location.address} ${location.city} ${location.state} ${location.zip}`)
 
   return (

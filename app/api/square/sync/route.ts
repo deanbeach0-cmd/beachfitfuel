@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { squareClient } from '@/lib/square'
+import type { DayHours } from '@/lib/locations'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +35,31 @@ type LocationRow = { id: string; slug: string; square_location_id: string }
 
 function resolvePriceForLocation(basePrice: number, overrides: Record<string, number>, squareLocationId: string): number {
   return overrides[squareLocationId] ?? basePrice
+}
+
+// 0 = Sunday ... 6 = Saturday, matching Date#getDay() and lib/locations.ts's DayHours shape.
+const SQUARE_DAY_TO_INDEX: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 }
+const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function parseLocalTimeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+function squareBusinessHoursToLocationHours(
+  periods: { dayOfWeek?: string | null; startLocalTime?: string | null; endLocalTime?: string | null }[]
+): Record<number, DayHours | null> {
+  const hours: Record<number, DayHours | null> = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null }
+  for (const p of periods) {
+    const dayIndex = p.dayOfWeek ? SQUARE_DAY_TO_INDEX[p.dayOfWeek] : undefined
+    if (dayIndex === undefined || !p.startLocalTime || !p.endLocalTime) continue
+    hours[dayIndex] = {
+      openMinutes: parseLocalTimeToMinutes(p.startLocalTime),
+      closeMinutes: parseLocalTimeToMinutes(p.endLocalTime),
+      label: DAY_LABELS[dayIndex],
+    }
+  }
+  return hours
 }
 
 // Shared by both triggers: POST for manual/curl syncs, GET for Vercel Cron
@@ -74,6 +100,25 @@ async function runSync() {
         { error: 'No active, Square-linked locations found in Supabase' },
         { status: 500 }
       )
+    }
+
+    // --- Sync business hours from Square's Locations API into locations.hours
+    // — previously a one-time hardcoded snapshot in lib/locations.ts with no
+    // way to ever pick up real changes; now refreshed on every sync run. ---
+    const squareLocationsRes = await squareClient.locations.list()
+    const squareLocationsById = new Map((squareLocationsRes.locations ?? []).map((l) => [l.id, l]))
+
+    for (const location of locations as LocationRow[]) {
+      const squareLocation = squareLocationsById.get(location.square_location_id)
+      const periods = squareLocation?.businessHours?.periods ?? []
+      if (periods.length === 0) continue // don't overwrite with empty data if Square has none set
+
+      const hours = squareBusinessHoursToLocationHours(periods)
+      const { error: hoursError } = await supabaseAdmin
+        .from('locations')
+        .update({ hours })
+        .eq('id', location.id)
+      if (hoursError) throw new Error(`Hours sync failed for "${location.slug}": ${hoursError.message}`)
     }
 
     // Fetch ITEM, CATEGORY, MODIFIER_LIST and MODIFIER catalog objects together
@@ -301,6 +346,21 @@ async function runSync() {
       if (row.square_item_id) existingMap.set(`${row.square_item_id}:${row.location_id}`, row.id)
     }
 
+    // --- Remove rows for items that no longer exist in Square's active
+    // catalog (deleted or archived there) — otherwise they sit invisible to
+    // this sync forever and stay live on the site indefinitely. FK cascades
+    // on menu_item_modifier_lists / square_item_variations clean up related
+    // rows automatically. ---
+    const activeSquareItemIds = new Set(items.map((i) => i.square_item_id))
+    const orphanedIds = (existing ?? [])
+      .filter((row) => row.square_item_id && !activeSquareItemIds.has(row.square_item_id))
+      .map((row) => row.id)
+
+    if (orphanedIds.length > 0) {
+      const { error: deleteError } = await supabaseAdmin.from('menu_items').delete().in('id', orphanedIds)
+      if (deleteError) throw new Error(`Orphan cleanup failed: ${deleteError.message}`)
+    }
+
     const keyFor = (item: ItemData, locationId: string) => `${item.square_item_id}:${locationId}`
 
     type TaggedItem = ItemData & { location_id: string; square_location_id: string }
@@ -416,6 +476,7 @@ async function runSync() {
       success: true,
       added: toInsert.length,
       updated: toUpdate.length,
+      deleted: orphanedIds.length,
       total: allTagged.length,
       locations: (locations as LocationRow[]).map((l) => l.slug),
       categories: { added: categoriesToInsert.length, updated: categoriesToUpdate.length },

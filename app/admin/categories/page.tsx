@@ -21,6 +21,7 @@ export type AdminMenuItem = Pick<
   | 'flavor_modifier_list_id'
   | 'required_flavor_count'
   | 'location_id'
+  | 'square_item_id'
 >
 
 export interface AdminFlavorSource {
@@ -36,7 +37,7 @@ export default async function AdminCategoriesPage() {
       supabaseAdmin
         .from('menu_items')
         .select(
-          'id, name, price, image_url, is_available, square_category_id, flavor_source_type, flavor_modifier_list_id, required_flavor_count, location_id'
+          'id, name, price, image_url, is_available, square_category_id, flavor_source_type, flavor_modifier_list_id, required_flavor_count, location_id, square_item_id'
         )
         .order('name', { ascending: true }),
       supabaseAdmin.from('square_modifier_lists').select('square_modifier_list_id, name'),

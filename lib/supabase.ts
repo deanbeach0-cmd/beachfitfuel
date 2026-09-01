@@ -1,14 +1,9 @@
-import { createBrowserClient, createServerClient } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import type { CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 const supabaseUrl      = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-// For Client Components
-export function createClient() {
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
-}
 
 // For Server Components, Route Handlers, and Server Actions
 export async function createServerComponentClient() {

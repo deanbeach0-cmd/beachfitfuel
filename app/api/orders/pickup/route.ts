@@ -3,6 +3,7 @@ import { squareClient, squareLocationIdForSlug } from '@/lib/square'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { pickupOrderConfirmationEmail } from '@/lib/email-templates'
 import { isWithinBusinessHours } from '@/lib/business-hours'
+import { getLocationHours } from '@/lib/location-hours'
 import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
 import { SALES_TAX_CATALOG_ID } from '@/lib/tax'
 import { getLocation } from '@/lib/locations'
@@ -86,11 +87,14 @@ export async function POST(request: NextRequest) {
 
   const pickupAt = resolvePickupAt(customer)
 
-  if (fulfillment === 'PICKUP' && !isWithinBusinessHours(location.slug, pickupAt ?? new Date().toISOString())) {
-    return NextResponse.json(
-      { error: 'That pickup time is outside our business hours. Please choose another time.' },
-      { status: 400 }
-    )
+  if (fulfillment === 'PICKUP') {
+    const hours = await getLocationHours(location.slug)
+    if (!isWithinBusinessHours(hours, location.timezone, pickupAt ?? new Date().toISOString())) {
+      return NextResponse.json(
+        { error: 'That pickup time is outside our business hours. Please choose another time.' },
+        { status: 400 }
+      )
+    }
   }
 
   const locationId = squareLocationIdForSlug(location.slug)

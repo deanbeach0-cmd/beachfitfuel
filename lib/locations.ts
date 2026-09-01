@@ -25,7 +25,13 @@ export interface LocationConfig {
   phoneDisplay: string
   phoneHref: string
   timezone: string
-  /** 0 = Sunday ... 6 = Saturday, matching Date#getDay() */
+  /**
+   * 0 = Sunday ... 6 = Saturday, matching Date#getDay().
+   * Fallback only — the real, live source of truth is Supabase's
+   * `locations.hours` column, kept fresh by the Square sync
+   * (see lib/location-hours.ts). This is what's used before that
+   * column is populated, or if the sync hasn't run yet.
+   */
   hours: Record<number, DayHours | null>
 }
 
@@ -104,16 +110,16 @@ export interface HoursRow {
 
 /** Compact display rows (e.g. "Mon – Fri", "Saturday", "Sunday"), grouping
  *  consecutive days that share identical hours. Monday-first, Sunday last. */
-export function getDisplayHoursRows(location: LocationConfig): HoursRow[] {
+export function getDisplayHoursRows(hours: Record<number, DayHours | null>): HoursRow[] {
   const order = [1, 2, 3, 4, 5, 6, 0]
   const rows: HoursRow[] = []
   let i = 0
   while (i < order.length) {
-    const today = location.hours[order[i]]
+    const today = hours[order[i]]
     const hoursLabel = today ? `${formatClockTime(today.openMinutes)} – ${formatClockTime(today.closeMinutes)}` : 'Closed'
 
     let j = i
-    while (j + 1 < order.length && sameHours(location.hours[order[j + 1]], today)) j++
+    while (j + 1 < order.length && sameHours(hours[order[j + 1]], today)) j++
 
     const dayLabel = i === j ? DAY_LABELS[order[i]] : `${DAY_ABBR[order[i]]} – ${DAY_ABBR[order[j]]}`
     rows.push({ day: dayLabel, hours: hoursLabel })

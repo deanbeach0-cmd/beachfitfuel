@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Trash2, ShoppingBag, CreditCard, Store, Truck } from 'lucide-react'
 import { usePickupCartStore } from '@/lib/pickup-cart-store'
-import { getPickupAvailability, PickupAvailability } from '@/lib/business-hours'
+import { PickupAvailability } from '@/lib/business-hours'
 import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
 import { SALES_TAX_RATE } from '@/lib/tax'
 import { LocationSlug, LOCATIONS } from '@/lib/locations'
@@ -72,13 +72,28 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
 
   useEffect(() => {
     setMounted(true)
-    const avail = getPickupAvailability(locationSlug)
-    setAvailability(avail)
-    // Store closed right now — pre-select the first available slot so the
-    // form always starts in a submittable state.
-    if (!avail.openNow && avail.nextDay?.slots.length) {
-      setCustomer((c) => ({ ...c, scheduledPickupAt: avail.nextDay!.slots[0].iso }))
+
+    async function loadAvailability() {
+      // Live hours, kept fresh by the Square sync — not the static
+      // lib/locations.ts fallback, which can drift from Square over time.
+      // Fetched via a small API route rather than querying Supabase
+      // directly, so the checkout page doesn't have to bundle the Supabase
+      // client just to read business hours.
+      try {
+        const res = await fetch(`/api/locations/${locationSlug}/hours`)
+        const avail: PickupAvailability = await res.json()
+        setAvailability(avail)
+        // Store closed right now — pre-select the first available slot so the
+        // form always starts in a submittable state.
+        if (!avail.openNow && avail.nextDay?.slots.length) {
+          setCustomer((c) => ({ ...c, scheduledPickupAt: avail.nextDay!.slots[0].iso }))
+        }
+      } catch {
+        setAvailability({ openNow: false, validOffsetMinutes: [] })
+      }
     }
+
+    loadAvailability()
   }, [locationSlug])
 
   // A cart built while ordering from the other location can't be fulfilled

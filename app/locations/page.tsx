@@ -2,7 +2,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Phone, Clock, Navigation, Zap, PalmtreeIcon } from 'lucide-react'
 import type { Metadata } from 'next'
-import { LOCATIONS, LocationConfig, formatClockTime } from '@/lib/locations'
+import { LOCATIONS, DayHours, formatClockTime } from '@/lib/locations'
+import { getLocationHours } from '@/lib/location-hours'
 
 export const metadata: Metadata = {
   title: 'Locations',
@@ -17,13 +18,13 @@ function getTodayIndex() {
   return js === 0 ? 6 : js - 1
 }
 
-function fullWeekHours(location: LocationConfig) {
+function fullWeekHours(hours: Record<number, DayHours | null>) {
   const order = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun
   return order.map((dayIndex) => {
-    const hours = location.hours[dayIndex]
+    const day = hours[dayIndex]
     return {
       day: FULL_DAY_LABELS[dayIndex],
-      hours: hours ? `${formatClockTime(hours.openMinutes)} – ${formatClockTime(hours.closeMinutes)}` : 'Closed',
+      hours: day ? `${formatClockTime(day.openMinutes)} – ${formatClockTime(day.closeMinutes)}` : 'Closed',
     }
   })
 }
@@ -33,8 +34,10 @@ const CARDS = [
   { location: LOCATIONS['battle-creek'], color: '#FAB65F', icon: Zap, storefrontPhoto: null },
 ] as const
 
-export default function LocationsPage() {
+export default async function LocationsPage() {
   const todayIdx = getTodayIndex()
+  const hoursByCard = await Promise.all(CARDS.map((c) => getLocationHours(c.location.slug)))
+  const hoursBySlug = Object.fromEntries(CARDS.map((c, i) => [c.location.slug, hoursByCard[i]]))
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FFF8EE' }}>
@@ -148,7 +151,7 @@ export default function LocationsPage() {
                     <h3 className="font-display text-lg tracking-widest text-dark">HOURS</h3>
                   </div>
                   <div className="flex flex-col divide-y divide-dark/5">
-                    {fullWeekHours(location).map((row, i) => (
+                    {fullWeekHours(hoursBySlug[location.slug]).map((row, i) => (
                       <div
                         key={row.day}
                         className={`flex justify-between py-2.5 ${i === todayIdx ? 'font-bold' : ''}`}

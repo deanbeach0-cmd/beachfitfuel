@@ -1,4 +1,4 @@
-import { getLocation, LocationSlug } from './locations'
+import type { DayHours } from './locations'
 
 interface ZonedNow {
   dayOfWeek: number
@@ -59,11 +59,11 @@ export interface PickupAvailability {
 const OFFSET_OPTIONS = [15, 30, 45, 60]
 const SLOT_INTERVAL_MINUTES = 30
 
-export function getPickupAvailability(locationSlug: LocationSlug, reference: Date = new Date()): PickupAvailability {
-  const location = getLocation(locationSlug)
-  if (!location) return { openNow: false, validOffsetMinutes: [] }
-
-  const { hours: HOURS, timezone } = location
+export function getPickupAvailability(
+  HOURS: Record<number, DayHours | null>,
+  timezone: string,
+  reference: Date = new Date()
+): PickupAvailability {
   const now = zonedNow(reference, timezone)
   const today = HOURS[now.dayOfWeek]
 
@@ -107,14 +107,11 @@ export function getPickupAvailability(locationSlug: LocationSlug, reference: Dat
 }
 
 /** Server-side guard: is this ISO timestamp actually within business hours? */
-export function isWithinBusinessHours(locationSlug: LocationSlug, iso: string): boolean {
-  const location = getLocation(locationSlug)
-  if (!location) return false
-
+export function isWithinBusinessHours(HOURS: Record<number, DayHours | null>, timezone: string, iso: string): boolean {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return false
-  const zoned = zonedNow(date, location.timezone)
-  const hours = location.hours[zoned.dayOfWeek]
+  const zoned = zonedNow(date, timezone)
+  const hours = HOURS[zoned.dayOfWeek]
   if (!hours) return false
   return zoned.minutesSinceMidnight >= hours.openMinutes && zoned.minutesSinceMidnight < hours.closeMinutes
 }

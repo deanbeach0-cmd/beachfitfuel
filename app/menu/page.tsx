@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { PalmtreeIcon, Zap } from 'lucide-react'
 import type { Metadata } from 'next'
 import { LOCATIONS, getDisplayHoursRows } from '@/lib/locations'
+import { getLocationHours } from '@/lib/location-hours'
 
 export const metadata: Metadata = {
   title: 'Menu',
@@ -13,7 +14,9 @@ const CARDS = [
   { location: LOCATIONS['battle-creek'], color: '#FAB65F', icon: Zap },
 ] as const
 
-export default function MenuLanding() {
+export default async function MenuLanding() {
+  const hoursByCard = await Promise.all(CARDS.map((c) => getLocationHours(c.location.slug)))
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FFF8EE' }}>
       {/* Header */}
@@ -35,8 +38,8 @@ export default function MenuLanding() {
       {/* Location cards */}
       <div className="max-w-4xl mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {CARDS.map(({ location, color, icon: Icon }) => {
-            const weekdayHours = getDisplayHoursRows(location)[0]
+          {CARDS.map(({ location, color, icon: Icon }, i) => {
+            const weekdayHours = getDisplayHoursRows(hoursByCard[i])[0]
             return (
               <Link
                 key={location.slug}
