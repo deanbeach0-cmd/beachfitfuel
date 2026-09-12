@@ -79,6 +79,7 @@ export function MenuGrid({ items, locationName, locationSlug, showOrderButton }:
                   category: menuItem.category_name ?? 'Menu',
                   shippable: menuItem.square_category_id === TO_GO_PACK_CATEGORY_ID,
                   locationSlug,
+                  squareVariationId: menuItem.square_variation_id,
                 })
               } : undefined}
             />

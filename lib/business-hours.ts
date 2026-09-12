@@ -59,6 +59,11 @@ export interface PickupAvailability {
 const OFFSET_OPTIONS = [15, 30, 45, 60]
 const SLOT_INTERVAL_MINUTES = 30
 
+// Staff need prep time right at open — online pickup ordering (ASAP and the
+// earliest bookable slot) doesn't start until this long after the store's
+// real opening time. Closing time is unaffected.
+export const PICKUP_OPEN_BUFFER_MINUTES = 30
+
 export function getPickupAvailability(
   HOURS: Record<number, DayHours | null>,
   timezone: string,
@@ -66,15 +71,17 @@ export function getPickupAvailability(
 ): PickupAvailability {
   const now = zonedNow(reference, timezone)
   const today = HOURS[now.dayOfWeek]
+  const todayOrderingOpensAt = today ? today.openMinutes + PICKUP_OPEN_BUFFER_MINUTES : null
 
-  if (today && now.minutesSinceMidnight >= today.openMinutes && now.minutesSinceMidnight < today.closeMinutes) {
+  if (today && todayOrderingOpensAt !== null && now.minutesSinceMidnight >= todayOrderingOpensAt && now.minutesSinceMidnight < today.closeMinutes) {
     const validOffsetMinutes = OFFSET_OPTIONS.filter(
       (m) => now.minutesSinceMidnight + m <= today.closeMinutes
     )
     return { openNow: true, validOffsetMinutes }
   }
 
-  // Closed — find the next day (starting today if it just hasn't opened yet) with hours.
+  // Closed — find the next day (starting today if it just hasn't opened yet, or
+  // is still inside the post-opening buffer) with hours.
   for (let daysAhead = 0; daysAhead < 8; daysAhead++) {
     const dayIndex = (now.dayOfWeek + daysAhead) % 7
     const hours = HOURS[dayIndex]
@@ -85,7 +92,7 @@ export function getPickupAvailability(
 
     const dayStart = new Date(now.startOfDay.getTime() + daysAhead * 24 * 60 * 60_000)
     const slots: PickupSlot[] = []
-    for (let m = hours.openMinutes; m < hours.closeMinutes; m += SLOT_INTERVAL_MINUTES) {
+    for (let m = hours.openMinutes + PICKUP_OPEN_BUFFER_MINUTES; m < hours.closeMinutes; m += SLOT_INTERVAL_MINUTES) {
       const slotDate = new Date(dayStart.getTime() + m * 60_000)
       const label = slotDate.toLocaleTimeString('en-US', {
         timeZone: timezone,
@@ -113,5 +120,8 @@ export function isWithinBusinessHours(HOURS: Record<number, DayHours | null>, ti
   const zoned = zonedNow(date, timezone)
   const hours = HOURS[zoned.dayOfWeek]
   if (!hours) return false
-  return zoned.minutesSinceMidnight >= hours.openMinutes && zoned.minutesSinceMidnight < hours.closeMinutes
+  return (
+    zoned.minutesSinceMidnight >= hours.openMinutes + PICKUP_OPEN_BUFFER_MINUTES &&
+    zoned.minutesSinceMidnight < hours.closeMinutes
+  )
 }

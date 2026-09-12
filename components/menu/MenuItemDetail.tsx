@@ -50,6 +50,7 @@ export function MenuItemDetail({ item, locationSlug, flavorOptions }: Props) {
       flavors: needsFlavors ? flavorSelections : undefined,
       shippable: item.square_category_id === TO_GO_PACK_CATEGORY_ID,
       locationSlug,
+      squareVariationId: item.square_variation_id,
     })
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)

@@ -22,6 +22,11 @@ export interface MenuItem {
   is_available: boolean
   display_order: number
   square_item_id: string | null
+  // The item's "regular"/pricing Square catalog variation id — lets online
+  // orders link their line items to a real catalog object (see
+  // app/api/orders/pickup/route.ts) instead of an ad-hoc one, which is what
+  // Square's sales-by-category reporting needs to categorize a sale.
+  square_variation_id: string | null
   square_category_id: string | null
   created_at: string
   // Present when selected from the `visible_menu_items` view (joined from

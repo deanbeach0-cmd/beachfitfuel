@@ -25,6 +25,9 @@ type ItemData = {
   price: number
   /** Square location id -> overridden price in dollars, from the primary variation */
   priceOverrides: Record<string, number>
+  /** The "regular"/pricing variation's Square id — lets online orders link
+   *  their line items to a real catalog object instead of an ad-hoc one. */
+  regularVariationId: string | null
   image_url: string | null
   image_urls: string[] | null
   modifierListIds: string[]
@@ -262,6 +265,7 @@ async function runSync() {
         const regularVariationData = regularVariation?.itemVariationData as Record<string, unknown> | undefined
         const priceMoney = regularVariationData?.priceMoney as Record<string, unknown> | undefined
         const price = priceMoney?.amount ? Number(priceMoney.amount) / 100 : 0
+        const regularVariationId = typeof regularVariation?.id === 'string' ? regularVariation.id : null
 
         const priceOverrides: Record<string, number> = {}
         const regularOverrides = (regularVariationData?.locationOverrides as Record<string, unknown>[] | undefined) ?? []
@@ -327,6 +331,7 @@ async function runSync() {
             null,
           price,
           priceOverrides,
+          regularVariationId,
           image_url: imageUrl,
           image_urls: imageUrls,
           modifierListIds,
@@ -396,6 +401,7 @@ async function runSync() {
         name: r.name,
         description: r.description,
         price: r.price,
+        square_variation_id: r.regularVariationId,
         image_url: r.image_url,
         image_urls: r.image_urls,
         is_available: true,
@@ -423,6 +429,7 @@ async function runSync() {
           name: item.name,
           description: item.description,
           price: item.price,
+          square_variation_id: item.regularVariationId,
           image_url: item.image_url,
           image_urls: item.image_urls,
           square_category_id: item.square_category_id,

@@ -109,8 +109,13 @@ export async function POST(request: NextRequest) {
   let orderTotalCents: number
   try {
     const TAX_UID = 'sales-tax'
+    // Linking to the real catalog variation (when we have one synced) is what
+    // lets Square's sales-by-category reporting categorize the sale — an
+    // ad-hoc name+price line item shows up as "Uncategorized". basePriceMoney
+    // is always included too, so the customer is charged exactly what they
+    // were quoted even if Square's catalog price has drifted since the last sync.
     const lineItems = items.map((i) => ({
-      name: i.name,
+      ...(i.squareVariationId ? { catalogObjectId: i.squareVariationId } : { name: i.name }),
       quantity: String(i.quantity),
       note: flavorNote(i),
       basePriceMoney: {
@@ -224,7 +229,31 @@ export async function POST(request: NextRequest) {
   const taxCents = orderTotalCents - subtotalCents - shippingCents
   const grandTotalCents = orderTotalCents + tipCents
 
-  // Step 3: Send confirmation email — never let a failed send fail the order,
+  // Step 3: Explicitly accept the order (PROPOSED -> RESERVED) so it surfaces
+  // as an actionable ticket on the Square POS — left at Square's default
+  // PROPOSED state, an order can sit invisible to staff indefinitely (this is
+  // exactly what happened to a real Marshall order that never got prepared).
+  // Re-fetch first since the payment above already advanced the order's
+  // version — reusing the stale version from order creation would be rejected.
+  // Never let a failure here fail the order — payment already succeeded.
+  try {
+    const { order: currentOrder } = await squareClient.orders.get({ orderId })
+    const fulfillmentUid = currentOrder?.fulfillments?.[0]?.uid
+    if (currentOrder?.version != null && fulfillmentUid) {
+      await squareClient.orders.update({
+        orderId,
+        order: {
+          locationId,
+          version: currentOrder.version,
+          fulfillments: [{ uid: fulfillmentUid, state: 'RESERVED' }],
+        },
+      })
+    }
+  } catch (err) {
+    console.error('[orders/pickup] Failed to mark order accepted (RESERVED)', err)
+  }
+
+  // Step 4: Send confirmation email — never let a failed send fail the order,
   // since payment/order creation already succeeded by this point.
   try {
     const { subject, html } = pickupOrderConfirmationEmail({
