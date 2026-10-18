@@ -9,22 +9,71 @@ import { SALES_TAX_CATALOG_ID } from '@/lib/tax'
 import { getLocation } from '@/lib/locations'
 import type { PickupCartItem, PickupCustomer, PickupTime, FulfillmentType, ShippingAddress } from '@/types/pickup'
 
-// Square requires an explicit pickup_at timestamp whenever the fulfillment
-// isn't ASAP — "SCHEDULED" alone isn't enough and gets rejected with
-// MISSING_REQUIRED_PARAMETER.
-const PICKUP_MINUTES: Record<Exclude<PickupTime, 'ASAP'>, number> = {
+const PICKUP_MINUTES: Record<PickupTime, number> = {
   '15min': 15,
   '30min': 30,
   '45min': 45,
   '1hr': 60,
 }
 
-// A specific next-day slot (customer.scheduledPickupAt) always wins over the
-// relative pickupTime offset — the offset only applies to the "open now" case.
-function resolvePickupAt(customer: PickupCustomer): string | undefined {
-  if (customer.scheduledPickupAt) return customer.scheduledPickupAt
-  if (customer.pickupTime === 'ASAP') return undefined
-  return new Date(Date.now() + PICKUP_MINUTES[customer.pickupTime] * 60_000).toISOString()
+// RFC 3339 durations, as Square's prep_time_duration expects.
+const PREP_DURATIONS: Record<PickupTime, string> = {
+  '15min': 'PT15M',
+  '30min': 'PT30M',
+  '45min': 'PT45M',
+  '1hr': 'PT1H',
+}
+
+type ResolvedPickup =
+  | { scheduleType: 'ASAP'; prepTimeDuration: string; readyAt: string }
+  | { scheduleType: 'SCHEDULED'; pickupAt: string; readyAt: string }
+
+// `readyAt` is our own copy of when the order is due. Square derives its
+// pickup_at independently for the ASAP case, so the two can differ by the
+// couple of seconds this request takes — immaterial, and we need a local
+// value for the hours check, the POS note, the email and the response.
+function resolvePickup(customer: PickupCustomer): ResolvedPickup {
+  // A specific slot — only offered while the store is closed — is a genuine
+  // future booking. SCHEDULED is right, and Square parking it under the POS
+  // "Upcoming" filter until its prep window is exactly where it belongs.
+  if (customer.scheduledPickupAt) {
+    return {
+      scheduleType: 'SCHEDULED',
+      pickupAt: customer.scheduledPickupAt,
+      readyAt: customer.scheduledPickupAt,
+    }
+  }
+
+  // Ordering for right now. Deliberately ASAP + prep_time_duration rather than
+  // SCHEDULED + pickup_at: Square resolves both to the same pickup time, but an
+  // ASAP fulfillment is active on the POS immediately, whereas a SCHEDULED one
+  // can sit in the Terminal's "Upcoming" filter — out of the staff's default
+  // view, which is how paid online orders went unnoticed.
+  // An unrecognized offset falls back to the floor rather than promising faster.
+  const offset: PickupTime = customer.pickupTime in PREP_DURATIONS ? customer.pickupTime : '15min'
+  return {
+    scheduleType: 'ASAP',
+    prepTimeDuration: PREP_DURATIONS[offset],
+    readyAt: new Date(Date.now() + PICKUP_MINUTES[offset] * 60_000).toISOString(),
+  }
+}
+
+// Square renders this on the POS ticket (max 500 chars). On a handheld Terminal
+// it's the most reliable place to put what staff must not miss, so the "this is
+// an online order, due at X" marker leads and the customer's note follows.
+function pickupNote(readyAt: string, timezone: string, customerNote?: string): string {
+  const ready = new Date(readyAt).toLocaleString('en-US', {
+    timeZone: timezone,
+    weekday: 'short',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+  const parts = [`ONLINE ORDER — ready by ${ready}`]
+  const trimmed = customerNote?.trim()
+  if (trimmed) parts.push(trimmed)
+  return parts.join(' | ').slice(0, 500)
 }
 
 interface PickupOrderRequest {
@@ -85,11 +134,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const pickupAt = resolvePickupAt(customer)
+  const resolved = resolvePickup(customer)
 
   if (fulfillment === 'PICKUP') {
     const hours = await getLocationHours(location.slug)
-    if (!isWithinBusinessHours(hours, location.timezone, pickupAt ?? new Date().toISOString())) {
+    if (!isWithinBusinessHours(hours, location.timezone, resolved.readyAt)) {
       return NextResponse.json(
         { error: 'That pickup time is outside our business hours. Please choose another time.' },
         { status: 400 }
@@ -141,6 +190,10 @@ export async function POST(request: NextRequest) {
       idempotencyKey: `pickup-order-${Date.now()}-${randomKey()}`,
       order: {
         locationId,
+        // Deliberately no `source`: Square already derives source.name from the
+        // application, and live orders arrive labelled "BeachFit Fuel Website",
+        // distinct from in-store "Point of Sale". Setting it here would only
+        // rename a value the POS may key on — not worth the risk.
         lineItems: allLineItems,
         taxes: [
           {
@@ -177,10 +230,18 @@ export async function POST(request: NextRequest) {
                     recipient: {
                       displayName: customer.name,
                       phoneNumber: customer.phone,
+                      emailAddress: customer.email,
                     },
-                    scheduleType: pickupAt ? 'SCHEDULED' : 'ASAP',
-                    pickupAt,
-                    note: customer.note || undefined,
+                    ...(resolved.scheduleType === 'ASAP'
+                      ? {
+                          scheduleType: 'ASAP' as const,
+                          prepTimeDuration: resolved.prepTimeDuration,
+                        }
+                      : {
+                          scheduleType: 'SCHEDULED' as const,
+                          pickupAt: resolved.pickupAt,
+                        }),
+                    note: pickupNote(resolved.readyAt, location.timezone, customer.note),
                   },
                 },
               ],
@@ -261,14 +322,17 @@ export async function POST(request: NextRequest) {
       totalCents: grandTotalCents,
       fulfillment,
       locationName: location.name,
-      pickupTime: pickupAt
-        ? new Date(pickupAt).toLocaleString('en-US', {
-            timeZone: location.timezone,
-            weekday: 'short',
-            hour: 'numeric',
-            minute: '2-digit',
-          })
-        : 'ASAP',
+      // Always a concrete clock time now — there is no ASAP. The date is
+      // included because a next-day slot rendered as "Mon, 9:30 AM" alone is
+      // ambiguous.
+      pickupTime: new Date(resolved.readyAt).toLocaleString('en-US', {
+        timeZone: location.timezone,
+        weekday: 'short',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
       shippingAddress: fulfillment === 'SHIPMENT' ? shippingAddress : undefined,
     })
     await resend.emails.send({ from: FROM_EMAIL, to: customer.email, subject, html })
@@ -280,5 +344,8 @@ export async function POST(request: NextRequest) {
     success: true,
     orderId,
     totalCents: grandTotalCents,
+    // The authoritative time, so the confirmation page shows what we actually
+    // sent Square rather than re-deriving an estimate on the client.
+    pickupAt: fulfillment === 'PICKUP' ? resolved.readyAt : undefined,
   })
 }

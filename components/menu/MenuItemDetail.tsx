@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import { ShoppingBag, Check } from 'lucide-react'
 import { usePickupCartStore } from '@/lib/pickup-cart-store'
 import { FlavorOption, MenuItem, TAG_LABELS } from '@/types/menu'
@@ -10,6 +9,7 @@ import { getCategoryStyle } from '@/lib/category-style'
 import { TO_GO_PACK_CATEGORY_ID } from '@/lib/shipping'
 import { LocationSlug } from '@/lib/locations'
 import { FlavorPicker } from './FlavorPicker'
+import { PhotoCarousel } from './PhotoCarousel'
 import { LocationSwitchNotice } from './LocationSwitchNotice'
 
 interface Props {
@@ -29,7 +29,6 @@ export function MenuItemDetail({ item, locationSlug, flavorOptions }: Props) {
     (url, index, all): url is string => !!url && all.indexOf(url) === index
   )
 
-  const [activePhoto, setActivePhoto] = useState<string | undefined>(photos[0])
   const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
   const [flavorSelections, setFlavorSelections] = useState<FlavorSelection[]>([])
@@ -60,39 +59,16 @@ export function MenuItemDetail({ item, locationSlug, flavorOptions }: Props) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
       {/* Photo(s) */}
       <div>
-        <div
-          className="aspect-square relative rounded-2xl overflow-hidden shadow-sm mb-3 flex items-center justify-center"
-          style={{ backgroundColor: style.color + '33' }}
-        >
-          {activePhoto ? (
-            <Image
-              src={activePhoto}
-              alt={item.name}
-              fill
-              className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              priority
-            />
-          ) : (
+        <PhotoCarousel
+          photos={photos}
+          alt={item.name}
+          backgroundColor={style.color + '33'}
+          fallback={
             <span className="text-8xl" role="img" aria-label={item.category_name ?? 'Menu item'}>
               {style.emoji}
             </span>
-          )}
-        </div>
-        {photos.length > 1 && (
-          <div className="flex gap-2 flex-wrap">
-            {photos.map((url) => (
-              <button
-                key={url}
-                onClick={() => setActivePhoto(url)}
-                className="relative w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors"
-                style={{ borderColor: activePhoto === url ? '#FF7B9D' : 'transparent' }}
-              >
-                <Image src={url} alt={item.name} fill className="object-cover" sizes="56px" />
-              </button>
-            ))}
-          </div>
-        )}
+          }
+        />
       </div>
 
       {/* Info */}

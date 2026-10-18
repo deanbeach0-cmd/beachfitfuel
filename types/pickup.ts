@@ -17,7 +17,9 @@ export interface PickupCartItem {
   squareVariationId?: string | null // links this line to a real Square catalog object for order reporting
 }
 
-export type PickupTime = 'ASAP' | '15min' | '30min' | '45min' | '1hr'
+/** Relative pickup offsets. There is deliberately no ASAP option — the kitchen
+ *  needs lead time, so 15 minutes is the hard floor for every online order. */
+export type PickupTime = '15min' | '30min' | '45min' | '1hr'
 
 export type FulfillmentType = 'PICKUP' | 'SHIPMENT'
 

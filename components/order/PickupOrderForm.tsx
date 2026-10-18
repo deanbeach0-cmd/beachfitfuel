@@ -24,18 +24,34 @@ declare global {
   }
 }
 
-const OFFSET_LABELS: Record<Exclude<PickupTime, 'ASAP'>, string> = {
+const OFFSET_VALUES: Record<number, PickupTime> = {
+  15: '15min',
+  30: '30min',
+  45: '45min',
+  60: '1hr',
+}
+
+const OFFSET_LABELS: Record<PickupTime, string> = {
   '15min': '15 min',
   '30min': '30 min',
   '45min': '45 min',
   '1hr': '1 hr',
 }
 
+/** "2:45 PM" for `minutes` from `from`, in the store's timezone. */
+function clockLabel(from: number, minutes: number, timezone: string): string {
+  return new Date(from + minutes * 60_000).toLocaleTimeString('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 const EMPTY_CUSTOMER: PickupCustomer = {
   name: '',
   phone: '',
   email: '',
-  pickupTime: 'ASAP',
+  pickupTime: '15min',
   note: '',
 }
 
@@ -59,6 +75,8 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
   const [fulfillment, setFulfillment] = useState<FulfillmentType>('PICKUP')
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>(EMPTY_SHIPPING)
   const [availability, setAvailability] = useState<PickupAvailability | null>(null)
+  // Drives the clock-time chip labels and the availability refresh below.
+  const [now, setNow] = useState(() => Date.now())
   const [tipOption, setTipOption] = useState<TipOption>('none')
   const [customTipInput, setCustomTipInput] = useState('')
   const [squareLoaded, setSquareLoaded] = useState(false)
@@ -94,6 +112,15 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
     }
 
     loadAvailability()
+
+    // Availability used to be fetched once and never again, so a tab left open
+    // across opening or closing showed options the server then rejected — and
+    // the "ready by" times drifted. Re-check every minute.
+    const timer = setInterval(() => {
+      setNow(Date.now())
+      loadAvailability()
+    }, 60_000)
+    return () => clearInterval(timer)
   }, [locationSlug])
 
   // A cart built while ordering from the other location can't be fulfilled
@@ -256,8 +283,9 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
 
       clearCart()
       const chargedTotal = ((data.totalCents ?? total) / 100).toFixed(2)
+      const pickupParam = data.pickupAt ? `&pickupAt=${encodeURIComponent(data.pickupAt)}` : ''
       router.push(
-        `/order/confirmation?orderId=${data.orderId}&total=${chargedTotal}&fulfillment=${fulfillment}&location=${locationSlug}`
+        `/order/confirmation?orderId=${data.orderId}&total=${chargedTotal}&fulfillment=${fulfillment}&location=${locationSlug}${pickupParam}`
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -514,33 +542,26 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
               </label>
               {availability?.openNow ? (
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCustomer((c) => ({ ...c, pickupTime: 'ASAP', scheduledPickupAt: undefined }))}
-                    className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
-                    style={
-                      customer.pickupTime === 'ASAP' && !customer.scheduledPickupAt
-                        ? { backgroundColor: '#FF7B9D', color: 'white' }
-                        : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
-                    }
-                  >
-                    ASAP
-                  </button>
                   {availability.validOffsetMinutes.map((minutes) => {
-                    const value = (minutes === 15 ? '15min' : minutes === 30 ? '30min' : minutes === 45 ? '45min' : '1hr') as Exclude<PickupTime, 'ASAP'>
+                    const value = OFFSET_VALUES[minutes]
+                    if (!value) return null
+                    const selected = customer.pickupTime === value && !customer.scheduledPickupAt
                     return (
                       <button
                         key={value}
                         type="button"
                         onClick={() => setCustomer((c) => ({ ...c, pickupTime: value, scheduledPickupAt: undefined }))}
-                        className="px-4 py-2 rounded-full font-body font-bold text-sm transition-all"
+                        className="px-4 py-2 rounded-2xl font-body text-sm leading-tight text-center transition-all"
                         style={
-                          customer.pickupTime === value && !customer.scheduledPickupAt
+                          selected
                             ? { backgroundColor: '#FF7B9D', color: 'white' }
                             : { backgroundColor: 'white', color: '#2C2C2C', border: '1.5px solid #e5e7eb' }
                         }
                       >
-                        {OFFSET_LABELS[value]}
+                        <span className="block font-bold">{OFFSET_LABELS[value]}</span>
+                        <span className="block text-xs opacity-70">
+                          {clockLabel(now, minutes, location.timezone)}
+                        </span>
                       </button>
                     )
                   })}
@@ -548,7 +569,9 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
               ) : (
                 <div className="flex flex-col gap-2">
                   <p className="font-body text-dark/50 text-sm">
-                    We&apos;re closed right now — pick a time for {availability?.nextDay?.label ?? 'our next open day'}:
+                    {availability?.orderingOpensAt
+                      ? `We're open, but online ordering starts at ${availability.orderingOpensAt} — pick a time:`
+                      : `We're closed right now — pick a time for ${availability?.nextDay?.label ?? 'our next open day'}:`}
                   </p>
                   <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
                     {availability?.nextDay?.slots.map((slot) => (

@@ -88,7 +88,7 @@ export function pickupOrderConfirmationEmail(params: {
       <div><strong>Order #:</strong> ${orderId}</div>
     `
     : `
-      <div><strong>Pickup time:</strong> ${pickupTime === 'ASAP' ? 'ASAP' : pickupTime}</div>
+      <div><strong>Ready by:</strong> ${pickupTime}</div>
       <div><strong>Order #:</strong> ${orderId}</div>
     `
 

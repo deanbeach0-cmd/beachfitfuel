@@ -9,7 +9,13 @@ export const metadata: Metadata = {
 }
 
 interface PageProps {
-  searchParams: Promise<{ orderId?: string; total?: string; fulfillment?: string; location?: string }>
+  searchParams: Promise<{
+    orderId?: string
+    total?: string
+    fulfillment?: string
+    location?: string
+    pickupAt?: string
+  }>
 }
 
 export default async function OrderConfirmationPage({ searchParams }: PageProps) {
@@ -18,6 +24,21 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
   const total = params.total ?? '0.00'
   const isShipment = params.fulfillment === 'SHIPMENT'
   const location = getLocation(params.location ?? '') ?? LOCATIONS.marshall
+
+  // Resolved server-side when the order was placed, so this is the same time
+  // the kitchen ticket carries — not a fresh estimate.
+  const pickupDate = params.pickupAt ? new Date(params.pickupAt) : null
+  const readyBy =
+    pickupDate && !Number.isNaN(pickupDate.getTime())
+      ? pickupDate.toLocaleString('en-US', {
+          timeZone: location.timezone,
+          weekday: 'short',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      : null
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16" style={{ backgroundColor: '#FFF8EE' }}>
@@ -42,6 +63,17 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
               : `We got it — your drinks will be ready for pickup at ${location.name}.`}
           </p>
         </div>
+
+        {/* Pickup time — the single thing the customer came here to confirm */}
+        {!isShipment && readyBy && (
+          <div
+            className="w-full rounded-2xl px-6 py-5"
+            style={{ backgroundColor: '#FF7B9D11', border: '1.5px solid #FF7B9D44' }}
+          >
+            <div className="font-body text-dark/50 text-xs uppercase tracking-widest">Ready by</div>
+            <div className="font-display text-3xl tracking-wide text-dark mt-1">{readyBy}</div>
+          </div>
+        )}
 
         {/* Order details card */}
         <div

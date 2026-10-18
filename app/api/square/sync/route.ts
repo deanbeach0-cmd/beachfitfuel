@@ -124,8 +124,8 @@ async function runSync() {
       if (hoursError) throw new Error(`Hours sync failed for "${location.slug}": ${hoursError.message}`)
     }
 
-    // Fetch ITEM, CATEGORY, MODIFIER_LIST and MODIFIER catalog objects together
-    // — Page is AsyncIterable, handles pagination automatically
+    // Fetch ITEM, CATEGORY, MODIFIER_LIST, MODIFIER and IMAGE catalog objects
+    // together — Page is AsyncIterable, handles pagination automatically
     const allObjects: Record<string, unknown>[] = []
 
     const page = await squareClient.catalog.list({ types: 'ITEM,CATEGORY,MODIFIER_LIST,MODIFIER,IMAGE' })

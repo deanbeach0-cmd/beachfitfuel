@@ -45,10 +45,15 @@ export interface PickupSlot {
 }
 
 export interface PickupAvailability {
-  /** Store is open right now and ASAP/relative-offset pickup is valid. */
+  /** Store is open right now and relative-offset pickup is valid. */
   openNow: boolean
   /** Relative offsets (in minutes) still valid today, e.g. [15, 30, 45, 60]. */
   validOffsetMinutes: number[]
+  /** Set only when the store is physically open but online ordering hasn't
+   *  started yet (we hold orders for PICKUP_OPEN_BUFFER_MINUTES after the
+   *  doors open). Lets the UI say "online ordering opens at 6:30 AM" rather
+   *  than claiming we're closed while staff are serving walk-ins. */
+  orderingOpensAt?: string
   /** Only populated when the store is closed (or about to close) right now. */
   nextDay?: {
     label: string
@@ -59,10 +64,22 @@ export interface PickupAvailability {
 const OFFSET_OPTIONS = [15, 30, 45, 60]
 const SLOT_INTERVAL_MINUTES = 30
 
-// Staff need prep time right at open — online pickup ordering (ASAP and the
-// earliest bookable slot) doesn't start until this long after the store's
-// real opening time. Closing time is unaffected.
+// Staff need prep time right at open — online pickup ordering (the earliest
+// bookable slot) doesn't start until this long after the store's real opening
+// time. Closing time is unaffected.
 export const PICKUP_OPEN_BUFFER_MINUTES = 30
+
+// The kitchen can never turn an order around instantly, so no online order is
+// ever promised sooner than this. There is deliberately no "ASAP" option.
+export const MIN_PICKUP_LEAD_MINUTES = 15
+
+function slotLabel(dayStart: Date, minutes: number, timezone: string): { label: string; iso: string } {
+  const date = new Date(dayStart.getTime() + minutes * 60_000)
+  return {
+    label: date.toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', minute: '2-digit' }),
+    iso: date.toISOString(),
+  }
+}
 
 export function getPickupAvailability(
   HOURS: Record<number, DayHours | null>,
@@ -71,13 +88,22 @@ export function getPickupAvailability(
 ): PickupAvailability {
   const now = zonedNow(reference, timezone)
   const today = HOURS[now.dayOfWeek]
-  const todayOrderingOpensAt = today ? today.openMinutes + PICKUP_OPEN_BUFFER_MINUTES : null
 
-  if (today && todayOrderingOpensAt !== null && now.minutesSinceMidnight >= todayOrderingOpensAt && now.minutesSinceMidnight < today.closeMinutes) {
-    const validOffsetMinutes = OFFSET_OPTIONS.filter(
-      (m) => now.minutesSinceMidnight + m <= today.closeMinutes
-    )
-    return { openNow: true, validOffsetMinutes }
+  if (today) {
+    const orderingOpensAt = today.openMinutes + PICKUP_OPEN_BUFFER_MINUTES
+    if (now.minutesSinceMidnight >= orderingOpensAt && now.minutesSinceMidnight < today.closeMinutes) {
+      // Strictly before closing: isWithinBusinessHours rejects a pickup at
+      // exactly closeMinutes, so offering that offset here would push the
+      // customer into a 400 *after* they'd already entered their card.
+      const validOffsetMinutes = OFFSET_OPTIONS.filter(
+        (m) => now.minutesSinceMidnight + m < today.closeMinutes
+      )
+      // Too late in the day for even the shortest offset — fall through to the
+      // next-day picker instead of rendering an empty, unsubmittable form.
+      if (validOffsetMinutes.length > 0) {
+        return { openNow: true, validOffsetMinutes }
+      }
+    }
   }
 
   // Closed — find the next day (starting today if it just hasn't opened yet, or
@@ -87,24 +113,33 @@ export function getPickupAvailability(
     const hours = HOURS[dayIndex]
     if (!hours) continue
 
-    // If checking today, only valid if we're before opening (not after closing).
+    // If checking today, only valid if we're before closing.
     if (daysAhead === 0 && now.minutesSinceMidnight >= hours.closeMinutes) continue
+
+    // A slot later today still has to be far enough out to actually make.
+    const earliestToday =
+      daysAhead === 0 ? now.minutesSinceMidnight + MIN_PICKUP_LEAD_MINUTES : -Infinity
 
     const dayStart = new Date(now.startOfDay.getTime() + daysAhead * 24 * 60 * 60_000)
     const slots: PickupSlot[] = []
     for (let m = hours.openMinutes + PICKUP_OPEN_BUFFER_MINUTES; m < hours.closeMinutes; m += SLOT_INTERVAL_MINUTES) {
-      const slotDate = new Date(dayStart.getTime() + m * 60_000)
-      const label = slotDate.toLocaleTimeString('en-US', {
-        timeZone: timezone,
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-      slots.push({ label, iso: slotDate.toISOString() })
+      if (m < earliestToday) continue
+      slots.push(slotLabel(dayStart, m, timezone))
     }
+    if (slots.length === 0) continue
+
+    // Physically open, but inside the post-opening buffer — say so honestly.
+    const inOpeningBuffer =
+      daysAhead === 0 &&
+      now.minutesSinceMidnight >= hours.openMinutes &&
+      now.minutesSinceMidnight < hours.openMinutes + PICKUP_OPEN_BUFFER_MINUTES
 
     return {
       openNow: false,
       validOffsetMinutes: [],
+      orderingOpensAt: inOpeningBuffer
+        ? slotLabel(dayStart, hours.openMinutes + PICKUP_OPEN_BUFFER_MINUTES, timezone).label
+        : undefined,
       nextDay: { label: daysAhead === 0 ? 'Today' : hours.label, slots },
     }
   }

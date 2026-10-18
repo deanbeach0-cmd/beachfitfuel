@@ -8,6 +8,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.squareup.com' },
       { protocol: 'https', hostname: '**.squarespace.com' },
       { protocol: 'https', hostname: 'items-images-production.s3.us-west-2.amazonaws.com' },
+      { protocol: 'https', hostname: 'items-images-sandbox.s3.us-west-2.amazonaws.com' },
       { protocol: 'https', hostname: 'files.cdn.printful.com' },
       { protocol: 'https', hostname: '**.cdn.printful.com' },
       { protocol: 'https', hostname: '**.supabase.co' },
