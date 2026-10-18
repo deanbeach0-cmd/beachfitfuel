@@ -4,7 +4,8 @@ import { resend, FROM_EMAIL } from '@/lib/resend'
 import { pickupOrderConfirmationEmail } from '@/lib/email-templates'
 import { isWithinBusinessHours } from '@/lib/business-hours'
 import { getLocationHours } from '@/lib/location-hours'
-import { SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
+import { isShippableItem, SHIPPING_FLAT_FEE_CENTS } from '@/lib/shipping'
+import { createServerComponentClient } from '@/lib/supabase'
 import { SALES_TAX_CATALOG_ID } from '@/lib/tax'
 import { getLocation } from '@/lib/locations'
 import type { PickupCartItem, PickupCustomer, PickupTime, FulfillmentType, ShippingAddress } from '@/types/pickup'
@@ -122,6 +123,23 @@ export async function POST(request: NextRequest) {
   }
 
   if (fulfillment === 'SHIPMENT') {
+    // Never take the client's word for what can be mailed — re-derive it from
+    // the catalog. Without this, a crafted request could ship a smoothie.
+    const supabase = await createServerComponentClient()
+    const { data: rows } = await supabase
+      .from('menu_items')
+      .select('id, square_item_id')
+      .in('id', items.map((i) => i.menuItemId))
+
+    const shippableById = new Map((rows ?? []).map((r) => [r.id, r.square_item_id]))
+    const blocked = items.filter((i) => !isShippableItem(shippableById.get(i.menuItemId)))
+    if (blocked.length > 0) {
+      return NextResponse.json(
+        { error: `Not available for shipping: ${blocked.map((i) => i.name).join(', ')}` },
+        { status: 400 }
+      )
+    }
+
     if (
       !shippingAddress?.firstName ||
       !shippingAddress?.lastName ||
@@ -208,9 +226,15 @@ export async function POST(request: NextRequest) {
                 {
                   type: 'SHIPMENT',
                   shipmentDetails: {
+                    // carrier + shippingNote are what mark this as a shipping
+                    // ticket on the POS, the way pickupDetails.note does for
+                    // pickup. Staff see it on the Shipments tab.
+                    carrier: 'USPS',
+                    shippingNote: `SHIP ORDER — USPS to ${shippingAddress!.city}, ${shippingAddress!.state}`,
                     recipient: {
                       displayName: `${shippingAddress!.firstName} ${shippingAddress!.lastName}`,
                       phoneNumber: customer.phone,
+                      emailAddress: customer.email,
                       address: {
                         addressLine1: shippingAddress!.address1,
                         addressLine2: shippingAddress!.address2 || undefined,

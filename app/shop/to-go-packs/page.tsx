@@ -1,20 +1,52 @@
+import Image from 'next/image'
 import Link from 'next/link'
-import { Package, Truck, Bell, ChevronRight } from 'lucide-react'
+import { Package, Truck } from 'lucide-react'
 import type { Metadata } from 'next'
+import { createServerComponentClient } from '@/lib/supabase'
+import { getCategoryStyle } from '@/lib/category-style'
+import {
+  isShippableItem,
+  SHIPPING_FLAT_FEE_CENTS,
+  SHIPPING_LOCATION_SLUG,
+  TO_GO_PACK_CATEGORY_ID,
+} from '@/lib/shipping'
+import type { MenuItem } from '@/types/menu'
 
 export const metadata: Metadata = {
   title: 'To-Go Packs',
   description:
-    'BeachFit Fuel to-go packs — enjoy your favorite drinks at home. Shipping nationwide soon.',
+    'Beach Bomb to-go packs shipped anywhere in the US. Pick your flavors — single packs, 5-packs, and 10-packs.',
 }
 
-const PERKS = [
-  { icon: '🏖️', title: 'SAME GREAT TASTE', body: 'All the beach bomb, protein shake, and energy drink flavors you love — packaged to make at home.' },
-  { icon: '📦', title: 'SHIPS NATIONWIDE', body: 'No matter where you are in the US, we\'ll get BeachFit Fuel to your door.' },
-  { icon: '💪', title: 'FUEL ON YOUR SCHEDULE', body: 'Stock up and fuel every morning, workout, or afternoon slump — on your terms.' },
-]
+const SHIPPING_FEE = `$${(SHIPPING_FLAT_FEE_CENTS / 100).toFixed(2)}`
 
-export default function ToGoPacksPage() {
+// Everything on this page ships, so it is priced and fulfilled out of the one
+// shipping location rather than whichever store the visitor last browsed.
+async function getShippableProducts(): Promise<MenuItem[]> {
+  const supabase = await createServerComponentClient()
+
+  const { data: location } = await supabase
+    .from('locations')
+    .select('id')
+    .eq('slug', SHIPPING_LOCATION_SLUG)
+    .single()
+
+  const { data } = await supabase
+    .from('visible_menu_items')
+    .select('*')
+    .eq('location_id', location?.id ?? '')
+    .eq('square_category_id', TO_GO_PACK_CATEGORY_ID)
+
+  // The Square category also holds ready-made drinks that are pickup-only, so
+  // the allowlist — not the category — decides what we are willing to mail.
+  return ((data ?? []) as MenuItem[])
+    .filter((item) => isShippableItem(item.square_item_id))
+    .sort((a, b) => Number(a.price) - Number(b.price))
+}
+
+export default async function ToGoPacksPage() {
+  const products = await getShippableProducts()
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FFF8EE' }}>
 
@@ -28,88 +60,121 @@ export default function ToGoPacksPage() {
             ← Back to Shop
           </Link>
           <div className="flex items-center gap-4">
-            <Package size={32} className="text-white" />
+            <Package size={32} className="text-white flex-shrink-0" />
             <div>
               <span className="font-body font-800 text-sm tracking-[0.2em] uppercase text-white/70">
-                Coming Soon
+                Shipped Nationwide
               </span>
               <h1 className="font-display text-5xl md:text-6xl tracking-wide text-white mt-1">
                 TO-GO PACKS
               </h1>
             </div>
           </div>
+          <p className="font-body text-white/85 mt-4 text-base max-w-xl">
+            Pick your flavors and we&apos;ll put them in the mail. Flat {SHIPPING_FEE} shipping via
+            USPS on every order, anywhere in the US.
+          </p>
         </div>
       </div>
 
-      {/* Body */}
-      <div className="max-w-4xl mx-auto px-4 py-16 flex flex-col gap-14">
-
-        {/* Coming soon hero */}
-        <div className="flex flex-col items-center text-center gap-6">
+      {/* Products */}
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        {products.length === 0 ? (
           <div
-            className="w-24 h-24 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: '#9BBDCF22' }}
-          >
-            <Truck size={40} style={{ color: '#9BBDCF' }} />
-          </div>
-          <div className="max-w-xl">
-            <h2 className="font-display text-3xl md:text-4xl tracking-wide text-dark">
-              BEACHFIT FUEL DELIVERED TO YOU
-            </h2>
-            <p className="font-body text-dark/60 mt-3 leading-relaxed">
-              We know not everyone can make it to Marshall or Battle Creek every day. That&apos;s
-              why we&apos;re building to-go packs — everything you need to make your favorite
-              BeachFit Fuel drinks at home, delivered right to your door.
-            </p>
-          </div>
-
-          {/* Notify CTA */}
-          <div
-            className="w-full max-w-md rounded-2xl p-7 flex flex-col gap-4"
+            className="rounded-2xl p-10 text-center"
             style={{ border: '2px dashed #9BBDCF', backgroundColor: '#9BBDCF0D' }}
           >
-            <Bell size={22} style={{ color: '#9BBDCF' }} className="mx-auto" />
-            <p className="font-display text-xl tracking-wide text-dark">BE THE FIRST TO SHOP</p>
-            <p className="font-body text-dark/60 text-sm">
-              Sign up and we&apos;ll let you know the moment to-go packs are available.
+            <Truck size={32} style={{ color: '#9BBDCF' }} className="mx-auto mb-4" />
+            <p className="font-display text-xl tracking-wide text-dark">TO-GO PACKS ARE RESTOCKING</p>
+            <p className="font-body text-dark/60 text-sm mt-2">
+              They&apos;ll be back shortly — check again soon, or grab one in store.
             </p>
-            <Link
-              href="/#newsletter"
-              className="block w-full text-center font-display tracking-widest text-base py-3 rounded-full text-white transition-transform hover:scale-[1.02]"
-              style={{ backgroundColor: '#9BBDCF' }}
-            >
-              GET NOTIFIED
-            </Link>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map((item) => {
+              const style = getCategoryStyle(
+                item.square_category_id ?? item.id,
+                item.category_emoji,
+                item.category_color
+              )
+              return (
+                <Link
+                  key={item.id}
+                  href={`/shop/to-go-packs/${item.id}`}
+                  className="bg-white rounded-2xl overflow-hidden shadow-sm border border-sky/20 flex flex-col hover:shadow-md transition-shadow"
+                >
+                  <div
+                    className="relative h-44 flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: style.color + '33' }}
+                  >
+                    {item.image_url ? (
+                      <Image
+                        src={item.image_url}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      />
+                    ) : (
+                      <span className="text-5xl" role="img" aria-label="To-go pack">
+                        {style.emoji}
+                      </span>
+                    )}
+                    <span
+                      className="absolute top-3 left-3 font-display tracking-widest text-xs px-3 py-1 rounded-full text-white shadow-sm"
+                      style={{ backgroundColor: '#9BBDCF' }}
+                    >
+                      SHIPS NATIONWIDE
+                    </span>
+                  </div>
 
-        {/* Perks */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {PERKS.map((p) => (
-            <div
-              key={p.title}
-              className="rounded-2xl p-6 flex flex-col gap-3"
-              style={{ backgroundColor: 'white', border: '1.5px solid #9BBDCF33' }}
-            >
-              <span className="text-4xl">{p.icon}</span>
-              <h3 className="font-display text-lg tracking-widest text-dark">{p.title}</h3>
-              <p className="font-body text-dark/60 text-sm leading-relaxed">{p.body}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Visit in person CTA */}
-        <div className="flex flex-col items-center gap-4 text-center">
-          <p className="font-body text-dark/50 text-sm">In the meantime, visit us in person</p>
-          <Link
-            href="/menu/marshall"
-            className="inline-flex items-center gap-2 font-display tracking-widest text-sm px-8 py-4 rounded-full text-white transition-transform hover:scale-[1.02]"
-            style={{ backgroundColor: '#FF7B9D' }}
-          >
-            VIEW MARSHALL MENU <ChevronRight size={16} />
-          </Link>
-        </div>
+                  <div className="p-5 flex flex-col gap-2 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 className="font-display text-lg tracking-widest text-dark leading-tight">
+                        {item.name}
+                      </h2>
+                      <span
+                        className="font-display text-lg flex-shrink-0"
+                        style={{ color: '#EC8A1E' }}
+                      >
+                        ${Number(item.price).toFixed(2)}
+                      </span>
+                    </div>
+                    {item.description && (
+                      <p className="font-body text-dark/60 text-sm leading-relaxed">
+                        {item.description}
+                      </p>
+                    )}
+                    <div
+                      className="mt-auto pt-4 text-center font-display tracking-widest text-sm py-3 rounded-full"
+                      style={{ backgroundColor: '#FFF8EE', color: '#2C2C2C' }}
+                    >
+                      CHOOSE FLAVORS →
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Local pickup nudge */}
+      <div className="py-12 px-4 text-center" style={{ backgroundColor: '#2C2C2C' }}>
+        <p className="font-display text-3xl tracking-wide text-white mb-2">NEARBY?</p>
+        <p className="font-body text-white/60 mb-6 text-sm max-w-md mx-auto">
+          Skip the {SHIPPING_FEE} shipping — order a to-go pack from the menu and pick it up in store.
+        </p>
+        <Link
+          href="/menu/marshall"
+          className="inline-flex items-center justify-center font-display tracking-widest text-base px-8 py-4 rounded-full text-white transition-transform hover:scale-105"
+          style={{ backgroundColor: '#FF7B9D' }}
+        >
+          SEE THE MENU
+        </Link>
+      </div>
+
     </div>
   )
 }

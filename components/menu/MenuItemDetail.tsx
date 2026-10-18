@@ -6,7 +6,7 @@ import { usePickupCartStore } from '@/lib/pickup-cart-store'
 import { FlavorOption, MenuItem, TAG_LABELS } from '@/types/menu'
 import { FlavorSelection } from '@/types/pickup'
 import { getCategoryStyle } from '@/lib/category-style'
-import { TO_GO_PACK_CATEGORY_ID } from '@/lib/shipping'
+import { isShippableItem } from '@/lib/shipping'
 import { LocationSlug } from '@/lib/locations'
 import { FlavorPicker } from './FlavorPicker'
 import { PhotoCarousel } from './PhotoCarousel'
@@ -47,7 +47,7 @@ export function MenuItemDetail({ item, locationSlug, flavorOptions }: Props) {
       emoji: style.emoji,
       category: item.category_name ?? 'Menu',
       flavors: needsFlavors ? flavorSelections : undefined,
-      shippable: item.square_category_id === TO_GO_PACK_CATEGORY_ID,
+      shippable: isShippableItem(item.square_item_id),
       locationSlug,
       squareVariationId: item.square_variation_id,
     })

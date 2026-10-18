@@ -133,6 +133,12 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
   }, [items, locationSlug, clearCart])
 
   const allItemsShippable = items.length > 0 && items.every((i) => i.shippable)
+  // Anything added from the Shop is sold ship-only — no pickup choice offered.
+  const shipOnly = items.length > 0 && items.some((i) => i.shipOnly)
+
+  useEffect(() => {
+    if (shipOnly) setFulfillment('SHIPMENT')
+  }, [shipOnly])
 
   // Tipping doesn't apply to mailed orders — reset if the customer switches to Ship.
   useEffect(() => {
@@ -379,9 +385,25 @@ export function PickupOrderForm({ locationSlug }: PickupOrderFormProps) {
           </div>
         </div>
 
+        {/* Ship-only cart (bought from the Shop) — state the terms, no choice
+            to make. */}
+        {shipOnly && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm flex items-start gap-3">
+            <Truck className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#9BBDCF' }} />
+            <div>
+              <h2 className="font-display text-xl tracking-widest text-dark">
+                SHIPPING — ${(SHIPPING_FLAT_FEE_CENTS / 100).toFixed(2)}
+              </h2>
+              <p className="font-body text-dark/50 text-xs mt-1">
+                Ships via USPS. Please allow a few business days.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Pickup vs Ship — only offered when every item in the cart is a
             shippable To-Go Pack (drinks/food can't be shipped) */}
-        {allItemsShippable && (
+        {!shipOnly && allItemsShippable && (
           <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-4">
             <h2 className="font-display text-xl tracking-widest text-dark">HOW WOULD YOU LIKE THIS?</h2>
             <div className="flex gap-3">

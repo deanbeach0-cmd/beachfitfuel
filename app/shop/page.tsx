@@ -5,7 +5,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Shop',
   description:
-    'Shop BeachFit Fuel — to-go packs shipped nationwide and branded apparel. Coming soon.',
+    'Shop BeachFit Fuel — Beach Bomb to-go packs shipped nationwide, and branded apparel coming soon.',
 }
 
 const SHOP_SECTIONS = [
@@ -16,8 +16,9 @@ const SHOP_SECTIONS = [
     title: 'TO-GO PACKS',
     subtitle: 'Ship to your door',
     description:
-      "Can't make it to a location? We're building to-go packs so you can enjoy BeachFit Fuel drinks from home. Ship anywhere in the US.",
+      "Can't make it to a location? Beach Bomb to-go packs ship anywhere in the US — pick your flavors and we'll put them in the mail.",
     color: '#9BBDCF',
+    comingSoon: false,
   },
   {
     href: '/shop/apparel',
@@ -28,6 +29,7 @@ const SHOP_SECTIONS = [
     description:
       'BeachFit Fuel branded gear — tees, hoodies, hats, and more. Look good while you fuel up.',
     color: '#FF7B9D',
+    comingSoon: true,
   },
 ]
 
@@ -47,13 +49,13 @@ export default function ShopPage() {
           THE SHOP
         </h1>
         <p className="font-body text-white/80 mt-3 text-base max-w-md mx-auto">
-          To-go packs and apparel — launching soon. Get notified when we go live.
+          Beach Bomb to-go packs, shipped to your door. Apparel is on the way.
         </p>
       </div>
 
       {/* Shop sections */}
       <div className="max-w-4xl mx-auto px-4 py-16 flex flex-col gap-8">
-        {SHOP_SECTIONS.map(({ href, Icon, emoji, title, subtitle, description, color }) => (
+        {SHOP_SECTIONS.map(({ href, Icon, emoji, title, subtitle, description, color, comingSoon }) => (
           <div
             key={href}
             className="rounded-3xl overflow-hidden shadow-md"
@@ -74,7 +76,7 @@ export default function ShopPage() {
                 className="font-body text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: 'white', color }}
               >
-                COMING SOON
+                {comingSoon ? 'COMING SOON' : '● SHIPPING NOW'}
               </span>
             </div>
 
@@ -83,20 +85,32 @@ export default function ShopPage() {
               <div className="flex flex-col gap-4 flex-1">
                 <p className="font-body text-dark/60 leading-relaxed">{description}</p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Link
-                    href="/#newsletter"
-                    className="flex items-center justify-center font-display tracking-widest text-sm py-3 px-6 rounded-full text-white transition-transform hover:scale-[1.02]"
-                    style={{ backgroundColor: color }}
-                  >
-                    NOTIFY ME WHEN IT&apos;S LIVE
-                  </Link>
-                  <Link
-                    href={href}
-                    className="flex items-center justify-center font-display tracking-widest text-sm py-3 px-6 rounded-full transition-transform hover:scale-[1.02]"
-                    style={{ backgroundColor: '#FFF8EE', color: '#2C2C2C', border: `1.5px solid ${color}` }}
-                  >
-                    LEARN MORE
-                  </Link>
+                  {comingSoon ? (
+                    <>
+                      <Link
+                        href="/#newsletter"
+                        className="flex items-center justify-center font-display tracking-widest text-sm py-3 px-6 rounded-full text-white transition-transform hover:scale-[1.02]"
+                        style={{ backgroundColor: color }}
+                      >
+                        NOTIFY ME WHEN IT&apos;S LIVE
+                      </Link>
+                      <Link
+                        href={href}
+                        className="flex items-center justify-center font-display tracking-widest text-sm py-3 px-6 rounded-full transition-transform hover:scale-[1.02]"
+                        style={{ backgroundColor: '#FFF8EE', color: '#2C2C2C', border: `1.5px solid ${color}` }}
+                      >
+                        LEARN MORE
+                      </Link>
+                    </>
+                  ) : (
+                    <Link
+                      href={href}
+                      className="flex items-center justify-center font-display tracking-widest text-sm py-3 px-6 rounded-full text-white transition-transform hover:scale-[1.02]"
+                      style={{ backgroundColor: color }}
+                    >
+                      SHOP TO-GO PACKS →
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

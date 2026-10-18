@@ -13,6 +13,9 @@ export interface PickupCartItem {
   category: string
   flavors?: FlavorSelection[] // set when the item required flavor picking
   shippable?: boolean // true for To-Go Pack items — eligible for USPS shipping
+  /** Added from the Shop, where pickup isn't offered. Set per-add rather than
+   *  per-product, so the same pack added from the menu can still be picked up. */
+  shipOnly?: boolean
   locationSlug: string // which location this line is fulfilled at — a cart can only hold one location at a time
   squareVariationId?: string | null // links this line to a real Square catalog object for order reporting
 }

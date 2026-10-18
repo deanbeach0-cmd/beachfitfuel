@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { MenuItem } from '@/types/menu'
 import { getCategoryStyle } from '@/lib/category-style'
-import { TO_GO_PACK_CATEGORY_ID } from '@/lib/shipping'
+import { isShippableItem } from '@/lib/shipping'
 import { LocationSlug } from '@/lib/locations'
 import { DrinkCard } from './DrinkCard'
 import { MenuFilter, CategoryFilterOption } from './MenuFilter'
@@ -77,7 +77,7 @@ export function MenuGrid({ items, locationName, locationSlug, showOrderButton }:
                   quantity: 1,
                   emoji: style.emoji,
                   category: menuItem.category_name ?? 'Menu',
-                  shippable: menuItem.square_category_id === TO_GO_PACK_CATEGORY_ID,
+                  shippable: isShippableItem(menuItem.square_item_id),
                   locationSlug,
                   squareVariationId: menuItem.square_variation_id,
                 })
