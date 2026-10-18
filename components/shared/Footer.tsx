@@ -7,6 +7,7 @@ const quickLinks = [
   { href: '/shop',      label: 'Shop' },
   { href: '/locations', label: 'Locations' },
   { href: '/our-story', label: 'Our Story' },
+  { href: '/faq',       label: 'FAQ' },
 ]
 
 const orderLinks = [
